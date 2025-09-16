@@ -3,4 +3,4 @@ This project is licensed under the Creative Commons Attribution-NonCommercial-Sh
 See [LICENSE](LICENSE) for details.
 
 Original project by [flywlyx](https://github.com/flywlyx/GNdrive).
-Forked and updated by <KUmoka>.
+Forked and updated by [KUmoka](https://github.com/KUmoka).
