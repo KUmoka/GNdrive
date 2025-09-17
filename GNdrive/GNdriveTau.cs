@@ -92,6 +92,7 @@ public class Taudrive : PartModule
         if (depleted == false)
         {
             agActivated = true;
+            engineIgnited = true;
             Events["Deactivateag"].guiActive = true;
             Events["Activateag"].guiActive = false;
         }
@@ -102,6 +103,7 @@ public class Taudrive : PartModule
     public void Deactivateag()
     {
         agActivated = false;
+        engineIgnited = false;
         Events["Deactivateag"].guiActive = false;
         Events["Activateag"].guiActive = true;
     }
@@ -171,6 +173,11 @@ public class Taudrive : PartModule
         float enginecount = 0;
         float tefactor = 1;
         float ID = GetInstanceID();
+
+        if (agActivated == true)
+        {
+            engineIgnited = true;
+        }
 
         foreach (Part p in this.vessel.Parts)
         {
