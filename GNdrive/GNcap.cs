@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class GNcap : BaseGNCore
 {
-    [KSPField] public float ConvertRatio = 1.25f; // GN→EC 変換効率（お好みで使用）
+    [KSPField] public float ConvertRatio = 1.25f; // GN→EC conversion, 変換効率（お好みで使用）
 
     protected override GNCapability Capabilities =>
         GNCapability.Particles | GNCapability.Thrust | GNCapability.Converter;
