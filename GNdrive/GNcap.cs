@@ -209,16 +209,14 @@ public class GNcap : PartModule
                     p.AddForce(controlforce * p.rb.mass);
                 }
             }
+            rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+            stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+            stator.GetComponent<Light>().color = color;
+
+            rotor.transform.localEulerAngles = new Vector3(90, 0, rotation);
+            rotation += 6 * (Mathf.Abs(controlforce.magnitude) + 1) * 120 * TimeWarp.deltaTime;
+            while (rotation > 360) rotation -= 360;
+            while (rotation < 0) rotation += 360;
         }
-
-        rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-        stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-        stator.GetComponent<Light>().color = color;
-
-        rotor.transform.localEulerAngles = new Vector3(90, 0, rotation);
-        rotation += 6 * (Mathf.Abs(controlforce.magnitude) + 1) * 120 * TimeWarp.deltaTime;
-        while (rotation > 360) rotation -= 360;
-        while (rotation < 0) rotation += 360;
-
     }
 }

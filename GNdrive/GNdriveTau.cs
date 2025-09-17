@@ -312,6 +312,14 @@ public class Taudrive : PartModule
                     p.AddForce(controlforce * p.rb.mass);
                 }
             }
+            rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+            stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+            stator.GetComponent<Light>().color = color;
+
+            rotor.transform.localEulerAngles = new Vector3(0, rotation, 0);
+            rotation += 6 * (Mathf.Abs(controlforce.magnitude) + 1) * 120 * TimeWarp.deltaTime;
+            while (rotation > 360) rotation -= 360;
+            while (rotation < 0) rotation += 360;
         }
 
 
@@ -325,15 +333,6 @@ public class Taudrive : PartModule
                 }
             }
         }
-        rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-        stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-        stator.GetComponent<Light>().color = color;
-
-        rotor.transform.localEulerAngles = new Vector3(0, rotation, 0);
-        rotation += 6 * (Mathf.Abs(controlforce.magnitude) + 1) * 120 * TimeWarp.deltaTime;
-        while (rotation > 360) rotation -= 360;
-        while (rotation < 0) rotation += 360;
-
     }
 
 }
