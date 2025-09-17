@@ -18,26 +18,26 @@ public enum GNCapability
 
 public abstract class BaseGNCore : PartModule
 {
-    // ===== 共通パラメータ =====
+    // ===== Common Parameters, 共通パラメータ =====
     [KSPField(guiActiveEditor = true)] public float fuelefficiency = 1f;
 
     [KSPField(guiActive = true, guiActiveEditor = true, guiName = "Max Overload", isPersistant = true),
      UI_FloatRange(minValue = 0f, maxValue = 5f, stepIncrement = 0.1f)]
     public float Overload = 1f;
 
-    // 粒子（cfgで調整可）
+    // PArticles (adjustable by cfg file), 粒子（cfgで調整可）
     [KSPField(guiActiveEditor = true)] public float idleEmission = 5f;     // スロ0でも常時これだけ出す
     [KSPField(guiActiveEditor = true)] public float emissionMult = 30f;     // スロットル倍率
     [KSPField(guiActiveEditor = true)] public float emissionClamp = 500f;   // 上限
     [KSPField] public string emitterTransformNames = "EMI";                 // "EMI,EMI2" など
 
-    // 反同期チェック（GNdriveで使っていた多機数制限、不要なら -1）
+    // Unsync check (For restriction of multiple drives in GNdrive), 反同期チェック（GNdriveで使っていた多機数制限、不要なら -1）
     [KSPField(guiActiveEditor = true)] public int maxEngineCount = -1;
 
-    // サウンド
+    // Soiunds, サウンド
     [KSPField] public string audioPath = "";
 
-    // ===== 状態 =====
+    // ===== State, 状態 =====
     [KSPField(isPersistant = true, guiActive = true, guiName = "Engine Status")]
     public string ES = "Deactivated";
 
@@ -49,11 +49,11 @@ public abstract class BaseGNCore : PartModule
 
     protected Vector4 color = Vector4.zero;
 
-    // 粒子/音
+    // Particles / sounds, 粒子/音
     protected readonly List<KSPParticleEmitter> emitters = new List<KSPParticleEmitter>();
     protected AudioSource audioSource;
 
-    // ホバー用PID
+    // PID for hovering, ホバー用PID
     protected PidController brakePid = new PidController(10F, 0.005F, 0.002F, 50, 5);
 
     // 視覚（回転/ノード）
