@@ -5,6 +5,9 @@ using UnityEngine;
 public class GNdrive : PartModule
 {
     [KSPField]
+    public float rotermultiplier = 5F;
+
+    [KSPField]
     public float fuelefficiency = 1F;
     [KSPField]
     public float particlegrate = 1000F;
@@ -513,7 +516,7 @@ public class GNdrive : PartModule
             stator.GetComponent<Light>().color = color;
 
             rotor.transform.localEulerAngles = new Vector3(0, 0, rotation);
-            rotation += 6 * (Mathf.Abs(controlforce.magnitude) + 1) * 120 * TimeWarp.deltaTime;
+            rotation += 6 * (Mathf.Abs(controlforce.magnitude) + 1) * 120 * TimeWarp.deltaTime * (1 + vessel.ctrlState.mainThrottle * rotermultiplier);
             while (rotation > 360) rotation -= 360;
             while (rotation < 0) rotation += 360;
 
