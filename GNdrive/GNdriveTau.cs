@@ -22,7 +22,6 @@ public class Taudrive : PartModule
     Transform EMITransform;
     KSPParticleEmitter Emitter;
 
-
     //    public bool staged = false;
     public float particleSize = 0.001f;
 
@@ -127,6 +126,9 @@ public class Taudrive : PartModule
 
     public override void OnStart(PartModule.StartState state)
     {
+        //Not flight, not active
+        if (HighLogic.LoadedSceneIsEditor) return;
+
         part.stagingIcon = "LIQUID_ENGINE";
         base.OnStart(state);
         {

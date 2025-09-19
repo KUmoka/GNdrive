@@ -90,6 +90,9 @@ public class GNcap : PartModule
 
     public override void OnStart(PartModule.StartState state)
     {
+        //Not flight, not active
+        if (HighLogic.LoadedSceneIsEditor) return;
+
         part.stagingIcon = "LIQUID_ENGINE";
         base.OnStart(state);
         {

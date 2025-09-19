@@ -23,7 +23,7 @@ public class GNdrive : PartModule
     public bool ICIsActivaed = false;
     public bool modified = false;
     public float overloadtemp = 0;
-    [KSPField] public string audioPath;
+    [KSPField] public string audioPath = "GNdrive/Audio/GNDriveTypical";
     AudioClip soundClip;
     AudioSource audioSource;
     Transform EMITransform;
@@ -194,6 +194,9 @@ public class GNdrive : PartModule
 
     public override void OnStart(PartModule.StartState state)
     {
+        //Not flight, not active
+        if (HighLogic.LoadedSceneIsEditor) return;
+
         part.stagingIcon = "LIQUID_ENGINE";
         if (state != StartState.Editor && state != StartState.None)
         {
@@ -234,24 +237,23 @@ public class GNdrive : PartModule
 
     void Update()
     {
-        if (HighLogic.LoadedSceneIsFlight)
-        {
-            if (PauseMenu.isOpen || Time.timeScale == 0 || !engineIgnited)
-            {
-                if (audioSource.isPlaying)
-                {
-                    audioSource.Stop();
-                    audioSource.volume = 0;
-                }
+        if (!HighLogic.LoadedSceneIsFlight) return;
 
+        // if audioSource not initialized, skip
+        if (audioSource != null)
+        {
+            bool shouldPlay = !(PauseMenu.isOpen || Time.timeScale == 0 || !engineIgnited);
+
+            if (shouldPlay)
+            {
+                if (!audioSource.isPlaying) audioSource.Play();
+                audioSource.volume = 1.0f;
+                audioSource.pitch = 1.0f;
             }
             else
             {
-                if (!audioSource.isPlaying)
-                {
-                    audioSource.Play();
-                    audioSource.volume = 100;
-                }
+                if (audioSource.isPlaying) audioSource.Stop();
+                audioSource.volume = 0f;
             }
         }
     }
