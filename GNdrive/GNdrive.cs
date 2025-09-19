@@ -420,6 +420,7 @@ public class GNdrive : PartModule
             gee = Vector3.zero;
             color = new Vector4(0F, 1F / 4F, 42F / 255F, 1F);
             Emitter.emit = false;
+            tefactor = 0.001F;
         }
         else
         {
