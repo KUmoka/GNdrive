@@ -470,6 +470,11 @@ public class GNdrive : PartModule
             taactivated = false;
         }
 
+        //Until here, all color change was completed.
+        rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+        stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+        stator.GetComponent<Light>().color = color;
+
         // Debug.Log("Consumption " + consumption);
         // Debug.Log("particlegen " + particlegen);
         // Debug.Log("tefactor " + tefactor);
@@ -517,10 +522,7 @@ public class GNdrive : PartModule
                 }
             }
 
-            rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-            stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-            stator.GetComponent<Light>().color = color;      
-
+            //Only engine==ignited, roter should rotate.
             rotor.transform.localEulerAngles = new Vector3(0, 0, rotation);
             rotation += 6 * (Mathf.Clamp01(controlforce.magnitude / 250f) + 1) * 120 * TimeWarp.deltaTime;// * (1 + vessel.ctrlState.mainThrottle * rotermultiplier);Mathf.Abs(controlforce.magnitude)
             while (rotation > 360) rotation -= 360;
