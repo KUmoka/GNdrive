@@ -164,6 +164,11 @@ public class GNcap : PartModule
         if (engineIgnited == false)
         {
             controlforce = Vector3.zero;
+            //Color set to zero while engineignited==false
+            color = new Vector4(0F, 0F, 0F, 1F);
+            rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+            stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+            stator.GetComponent<Light>().color = color;
         }
 
         double consumption = vessel.GetTotalMass() * Mathf.Abs((controlforce).magnitude) * fuelefficiency * TimeWarp.deltaTime;
@@ -183,7 +188,6 @@ public class GNcap : PartModule
 
         double GNconsumtion = this.part.RequestResource("GNparticle", consumption);
         double Egen = this.part.RequestResource("ElectricCharge", -GNconsumtion / 10);
-        color = new Vector4(0F, 1F, 170F / 255F, 1F);
 
         if (consumption != 0 && Math.Round(GNconsumtion, 5) < Math.Round(consumption, 5))
         {
@@ -209,6 +213,8 @@ public class GNcap : PartModule
                     p.AddForce(controlforce * p.rb.mass);
                 }
             }
+            //Color set to non-zero while engineignited==true
+            color = new Vector4(0F, 1F, 170F / 255F, 1F);
             rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
             stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
             stator.GetComponent<Light>().color = color;

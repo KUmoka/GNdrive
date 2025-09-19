@@ -406,11 +406,20 @@ public class GNdrive : PartModule
         brakePid.Calibrateclamp(Overload);
         Vector3 VvCancel = hvActivated ? brakePid.Control(Vvelocity) * gee.normalized * 10 / agenginecount : Vector3.zero;
         Vector3 controlforce = vessel.ReferenceTransform.up * z + vessel.ReferenceTransform.forward * y + vessel.ReferenceTransform.right * x - VvCancel;
+
+        //default (engine activated).
+        color = new Vector4(0F, 1F, 170F / 255F, 1F);
+        Emitter.emit = true;
+
+        //Drive state and color decision.
+        //Particle Emmission should be zero at Unsynchronized state.
         if (enginecount > maxenginecount)
         {
             ES = "Unsynchronized";
             controlforce = Vector3.zero;
             gee = Vector3.zero;
+            color = new Vector4(0F, 1F / 4F, 42F / 255F, 1F);
+            Emitter.emit = false;
         }
         else
         {
@@ -420,6 +429,9 @@ public class GNdrive : PartModule
         if (engineIgnited == false)
         {
             controlforce = Vector3.zero;
+            //deactivated color
+            color = new Vector4(0F, 0F, 0F, 1F);
+            Emitter.emit = false;
         }
         if (agActivated == false)
         {
@@ -438,7 +450,6 @@ public class GNdrive : PartModule
         }
         else
         {
-            color = new Vector4(0F, 1F, 170F / 255F, 1F);
             if (engineIgnited == true)
             {
                 Events["Activateta"].guiActive = true;
@@ -458,8 +469,6 @@ public class GNdrive : PartModule
             Deactivateag();
             taactivated = false;
         }
-
-
 
         // Debug.Log("Consumption " + consumption);
         // Debug.Log("particlegen " + particlegen);
@@ -510,7 +519,7 @@ public class GNdrive : PartModule
 
             rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
             stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-            stator.GetComponent<Light>().color = color;
+            stator.GetComponent<Light>().color = color;      
 
             rotor.transform.localEulerAngles = new Vector3(0, 0, rotation);
             rotation += 6 * (Mathf.Clamp01(controlforce.magnitude / 250f) + 1) * 120 * TimeWarp.deltaTime;// * (1 + vessel.ctrlState.mainThrottle * rotermultiplier);Mathf.Abs(controlforce.magnitude)

@@ -271,6 +271,11 @@ public class Taudrive : PartModule
         if (engineIgnited == false)
         {
             controlforce = Vector3.zero;
+            //Color set to zero while engineignited==false
+            color = new Vector4(0F, 0F, 0F, 1F);
+            rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+            stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+            stator.GetComponent<Light>().color = color;
         }
         if (agActivated == false)
         {
@@ -288,7 +293,6 @@ public class Taudrive : PartModule
         }
 
         double GNconsumtion = this.part.RequestResource("GNparticle", consumption);
-        color = new Vector4(1F, 0F, 36F / 255F, 1F);
 
         if (consumption !=0 && Math.Round(GNconsumtion,5) < Math.Round(consumption,5))
         {
@@ -318,6 +322,8 @@ public class Taudrive : PartModule
                     p.AddForce(controlforce * p.rb.mass);
                 }
             }
+            //Color set to non-zero while engineignited==true
+            color = new Vector4(1F, 0F, 36F / 255F, 1F);
             rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
             stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
             stator.GetComponent<Light>().color = color;
