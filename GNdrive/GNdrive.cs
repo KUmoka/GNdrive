@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 
@@ -220,19 +220,47 @@ public class GNdrive : PartModule
 
     public void SetupAudio()
     {
-        soundClip = GameDatabase.Instance.GetAudioClip(audioPath);
-        Debug.Log("GNdrive Sound Get"+ soundClip.name);
-        audioSource = this.gameObject.AddComponent<AudioSource>();
-        audioSource.clip = soundClip;
-        audioSource.loop = true;
-        audioSource.dopplerLevel = 0;
-        audioSource.minDistance = 0.1f;
-        audioSource.maxDistance = 150;
-        audioSource.Play();
-        audioSource.volume = 0;
-        audioSource.pitch = 0;
-        audioSource.priority = 9999;
-        audioSource.spatialBlend = 1;
+        try
+        {
+            if (string.IsNullOrEmpty(audioPath))
+            {
+                Debug.LogWarning("[GN] audioPath is empty");
+                return;
+            }
+
+            soundClip = GameDatabase.Instance.GetAudioClip(audioPath);
+            if (soundClip == null)
+            {
+                Debug.LogError("[GN] AudioClip not found: " + audioPath);
+                return;
+            }
+            Debug.Log("[GN] Sound loaded: " + soundClip.name);
+
+            // AudioSource should be attached to the part if possible, otherwise to the part's root object
+            var host = part != null ? part.gameObject : this.gameObject;
+            audioSource = host.GetComponent<AudioSource>() ?? host.AddComponent<AudioSource>();
+            if (audioSource == null)
+            {
+                Debug.LogError("[GN] AudioSource add/get failed");
+                return;
+            }
+
+            audioSource.clip = soundClip;
+            audioSource.loop = true;
+            audioSource.playOnAwake = false;
+            audioSource.dopplerLevel = 0f;
+            audioSource.spatialBlend = 1f; // 3D
+            audioSource.minDistance = 5f;
+            audioSource.maxDistance = 150f;
+            audioSource.priority = 128;    // 0 to 256
+            audioSource.volume = 0f;       // 0..1
+            audioSource.pitch = 1f;       // uusually 1f
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("[GN] SetupAudio exception: " + e);
+            audioSource = null; //avoid repeated error
+        }
     }
 
     void Update()
