@@ -259,8 +259,26 @@ public class GNdrive : PartModule
         }
     }
 
-    void Update()
+    public void Update()
     {
+        if (HighLogic.LoadedSceneIsEditor)
+        {
+            if (Emitter) Emitter.emit = false;
+            Debug.Log("[GN] GNdrive_OnUpdate fired");
+            color = new Vector4(0F, 0F, 0F, 1F);
+
+            var rr = rotor ? rotor.GetComponent<Renderer>() : null;
+            if (rr && rr.material && rr.material.HasProperty("_EmissiveColor"))
+                rr.material.SetColor("_EmissiveColor", Color.black);
+
+            var sr = stator ? stator.GetComponent<Renderer>() : null;
+            if (sr && sr.material && sr.material.HasProperty("_EmissiveColor"))
+                sr.material.SetColor("_EmissiveColor", Color.black);
+
+            rotation = 0;
+            return;
+        }
+
         if (audioSource != null)
         {
             bool shouldPlay = !(PauseMenu.isOpen || Time.timeScale == 0 || !engineIgnited);
@@ -289,8 +307,8 @@ public class GNdrive : PartModule
                 color = new Vector4(0F, 1F, 170F / 255F, 1F);
             }                
             Vector4 ctrlVec = new Vector4(vessel.ctrlState.X, vessel.ctrlState.Y, vessel.ctrlState.Z, vessel.ctrlState.mainThrottle);
-            float rps = Mathf.Lerp(0.5f, 25f, (ctrlVec.magnitude * 0.5f));    // スロットルで補間
-            float step = (9 * rps + 1)  * 1 / 30f;           // 60fps基準
+            float rps = Mathf.Lerp(10f, 100f, (ctrlVec.magnitude * 0.5f));
+            float step = rps  * 1 / 30f;
             rotation += step;
             if (rotation >= 360f) rotation -= 360f;
             Emitter.emit = true;
@@ -314,18 +332,10 @@ public class GNdrive : PartModule
             rotor.transform.localEulerAngles = new Vector3(0f, 0f, rotation);
         }
 
-        if (HighLogic.LoadedSceneIsEditor)
-        {
-            color = new Vector4(0F, 0F, 0F, 1F);
-            Emitter.emit = false;
-            rotation = 0;
-        }
-
         rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
         stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
         stator.GetComponent<Light>().color = color;
     }
-
 
     public override void OnFixedUpdate()
     {
@@ -355,7 +365,6 @@ public class GNdrive : PartModule
 
         if (engineIgnited == true)
         {
-            Emitter.emit = true;
             foreach (Part p in this.vessel.Parts)
             {
                 foreach (PartModule m in p.Modules)
