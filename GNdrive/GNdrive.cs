@@ -194,9 +194,6 @@ public class GNdrive : PartModule
 
     public override void OnStart(PartModule.StartState state)
     {
-        //Not flight, not active
-        if (HighLogic.LoadedSceneIsEditor) return;
-
         part.stagingIcon = "LIQUID_ENGINE";
         if (state != StartState.Editor && state != StartState.None)
         {
@@ -215,7 +212,6 @@ public class GNdrive : PartModule
 
         overloadtemp = Overload;
         SetupAudio();
-
     }
 
     public void SetupAudio()
@@ -265,9 +261,6 @@ public class GNdrive : PartModule
 
     void Update()
     {
-        if (!HighLogic.LoadedSceneIsFlight) return;
-
-        // if audioSource not initialized, skip
         if (audioSource != null)
         {
             bool shouldPlay = !(PauseMenu.isOpen || Time.timeScale == 0 || !engineIgnited);
@@ -284,6 +277,53 @@ public class GNdrive : PartModule
                 audioSource.volume = 0f;
             }
         }
+
+        if (engineIgnited == true)
+        {
+            if (taactivated == true)
+            {
+                color = new Vector4(1F, 0F, 100F / 255F, 1F);
+            }
+            else
+            {
+                color = new Vector4(0F, 1F, 170F / 255F, 1F);
+            }                
+            Vector4 ctrlVec = new Vector4(vessel.ctrlState.X, vessel.ctrlState.Y, vessel.ctrlState.Z, vessel.ctrlState.mainThrottle);
+            float rps = Mathf.Lerp(0.5f, 25f, (ctrlVec.magnitude * 0.5f));    // スロットルで補間
+            float step = (9 * rps + 1)  * 1 / 30f;           // 60fps基準
+            rotation += step;
+            if (rotation >= 360f) rotation -= 360f;
+            Emitter.emit = true;
+        }
+
+        if (ES == "Unsynchronized")
+        {
+            color = new Vector4(0F, 1F / 4F, 42F / 255F, 1F);
+            Emitter.emit = false;
+        }
+
+        if (engineIgnited == false)
+        {
+            color = new Vector4(0F, 0F, 0F, 1F);
+            Emitter.emit = false;
+            rotation = 0;
+        }
+
+        if (rotor)
+        {
+            rotor.transform.localEulerAngles = new Vector3(0f, 0f, rotation);
+        }
+
+        if (HighLogic.LoadedSceneIsEditor)
+        {
+            color = new Vector4(0F, 0F, 0F, 1F);
+            Emitter.emit = false;
+            rotation = 0;
+        }
+
+        rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+        stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
+        stator.GetComponent<Light>().color = color;
     }
 
 
@@ -370,10 +410,6 @@ public class GNdrive : PartModule
                 }
             }
         }
-        else
-        {
-            Emitter.emit = false;
-        }
 
         modified = false;
 
@@ -437,19 +473,11 @@ public class GNdrive : PartModule
         Vector3 VvCancel = hvActivated ? brakePid.Control(Vvelocity) * gee.normalized * 10 / agenginecount : Vector3.zero;
         Vector3 controlforce = vessel.ReferenceTransform.up * z + vessel.ReferenceTransform.forward * y + vessel.ReferenceTransform.right * x - VvCancel;
 
-        //default (engine activated).
-        color = new Vector4(0F, 1F, 170F / 255F, 1F);
-        Emitter.emit = true;
-
-        //Drive state and color decision.
-        //Particle Emmission should be zero at Unsynchronized state.
         if (enginecount > maxenginecount)
         {
             ES = "Unsynchronized";
             controlforce = Vector3.zero;
             gee = Vector3.zero;
-            color = new Vector4(0F, 1F / 4F, 42F / 255F, 1F);
-            Emitter.emit = false;
             tefactor = 0.001F;
         }
         else
@@ -460,9 +488,6 @@ public class GNdrive : PartModule
         if (engineIgnited == false)
         {
             controlforce = Vector3.zero;
-            //deactivated color
-            color = new Vector4(0F, 0F, 0F, 1F);
-            Emitter.emit = false;
         }
         if (agActivated == false)
         {
@@ -473,7 +498,7 @@ public class GNdrive : PartModule
 
         if (taactivated == true)
         {
-            color = new Vector4(1F, 0F, 100F / 255F, 1F);
+
             controlforce *= 5;
             consumption = 4 * consumption - 3 * vessel.GetTotalMass() * Mathf.Abs(gee.magnitude) * fuelefficiency;
             Events["Activateta"].guiActive = false;
@@ -500,11 +525,6 @@ public class GNdrive : PartModule
             Deactivateag();
             taactivated = false;
         }
-
-        //Until here, all color change was completed.
-        rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-        stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-        stator.GetComponent<Light>().color = color;
 
         // Debug.Log("Consumption " + consumption);
         // Debug.Log("particlegen " + particlegen);
@@ -553,14 +573,7 @@ public class GNdrive : PartModule
                 }
             }
 
-            //Only engine==ignited, roter should rotate.
-            rotor.transform.localEulerAngles = new Vector3(0, 0, rotation);
-            rotation += 6 * (Mathf.Clamp01(controlforce.magnitude / 250f) + 1) * 120 * TimeWarp.deltaTime;// * (1 + vessel.ctrlState.mainThrottle * rotermultiplier);Mathf.Abs(controlforce.magnitude)
-            while (rotation > 360) rotation -= 360;
-            while (rotation < 0) rotation += 360;
-
         }
-
         void InertiaControl()
         {
 
@@ -605,7 +618,6 @@ public class GNdrive : PartModule
                     }
                 }
             }
-
             controlforce += (InertiaForce) / Time.fixedDeltaTime/enginecount;
         }
     }

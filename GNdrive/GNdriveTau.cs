@@ -150,9 +150,10 @@ public class Taudrive : PartModule
             EMITransform = base.part.FindModelTransform("EMI");
             Emitter = EMITransform.gameObject.GetComponent<KSPParticleEmitter>();
             Emitter.emit = false;
-
-
         }
+        //When Start, always start with deactivated.
+        color = new Vector4(0F, 0F, 0F, 1F);
+        Emitter.emit = false;
     }
 
 

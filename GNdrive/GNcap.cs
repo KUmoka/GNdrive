@@ -18,7 +18,6 @@ public class GNcap : PartModule
     public bool depleted = false;
     public bool ecActivated = false;
 
-
     //    public bool staged = false;
     public float particleSize = 0.001f;
 
@@ -116,6 +115,9 @@ public class GNcap : PartModule
             Emitter.emit = false;
 
         }
+        //When Start, always start with deactivated.
+        color = new Vector4(0F, 0F, 0F, 1F);
+        Emitter.emit = false;
     }
 
 
