@@ -129,9 +129,6 @@ public class Taudrive : PartModule
 
     public override void OnStart(PartModule.StartState state)
     {
-        //Not flight, not active
-        if (HighLogic.LoadedSceneIsEditor) return;
-
         part.stagingIcon = "LIQUID_ENGINE";
         base.OnStart(state);
         {
@@ -154,7 +151,19 @@ public class Taudrive : PartModule
             Emitter = EMITransform.gameObject.GetComponent<KSPParticleEmitter>();
             Emitter.emit = false;
         }
+
         SetupAudio();
+
+        var rr = rotor ? rotor.GetComponent<Renderer>() : null;
+        if (rr && rr.material && rr.material.HasProperty("_EmissiveColor"))
+        rr.material.SetColor("_EmissiveColor", Color.black);
+        rr.material.SetColor("_Color", Color.gray);
+
+        var sr = stator ? stator.GetComponent<Renderer>() : null;
+        if (sr && sr.material && sr.material.HasProperty("_EmissiveColor"))
+        sr.material.SetColor("_EmissiveColor", Color.black);
+        sr.material.SetColor("_Color", Color.gray);
+
     }
     public void SetupAudio()
     {
@@ -206,15 +215,16 @@ public class Taudrive : PartModule
         {
             if (Emitter) Emitter.emit = false;
             Debug.Log("[GN] GNDT_OnUpdate fired");
-            color = new Vector4(0F, 0F, 0F, 1F);
 
             var rr = rotor ? rotor.GetComponent<Renderer>() : null;
             if (rr && rr.material && rr.material.HasProperty("_EmissiveColor"))
-                rr.material.SetColor("_EmissiveColor", Color.black);
+            rr.material.SetColor("_EmissiveColor", Color.black);
+            rr.material.SetColor("_Color", Color.gray);
 
             var sr = stator ? stator.GetComponent<Renderer>() : null;
             if (sr && sr.material && sr.material.HasProperty("_EmissiveColor"))
-                sr.material.SetColor("_EmissiveColor", Color.black);
+            sr.material.SetColor("_EmissiveColor", Color.black);
+            sr.material.SetColor("_Color", Color.gray);
 
             rotation = 0;
             return;
@@ -257,7 +267,7 @@ public class Taudrive : PartModule
 
         if (rotor)
         {
-            rotor.transform.localEulerAngles = new Vector3(0f, 0f, rotation);
+            rotor.transform.localEulerAngles = new Vector3(0f, rotation, 0f);
         }
 
         rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);

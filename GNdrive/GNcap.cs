@@ -92,9 +92,6 @@ public class GNcap : PartModule
 
     public override void OnStart(PartModule.StartState state)
     {
-        //Not flight, not active
-        if (HighLogic.LoadedSceneIsEditor) return;
-
         part.stagingIcon = "LIQUID_ENGINE";
         base.OnStart(state);
         {
@@ -118,7 +115,18 @@ public class GNcap : PartModule
             Emitter.emit = false;
 
         }
+
         SetupAudio();
+
+        var rr = rotor ? rotor.GetComponent<Renderer>() : null;
+        if (rr && rr.material && rr.material.HasProperty("_EmissiveColor"))
+        rr.material.SetColor("_EmissiveColor", Color.black);
+        rr.material.SetColor("_Color", Color.gray);
+
+        var sr = stator ? stator.GetComponent<Renderer>() : null;
+        if (sr && sr.material && sr.material.HasProperty("_EmissiveColor"))
+        sr.material.SetColor("_EmissiveColor", Color.black);
+        sr.material.SetColor("_Color", Color.gray);
     }
     public void SetupAudio()
     {
@@ -203,7 +211,7 @@ public class GNcap : PartModule
 
         if (engineIgnited == true)
         {
-            color = new Vector4(1F, 0F, 36F / 255F, 1F);
+            color = new Vector4(0F, 1F, 170F / 255F, 1F);
             Vector4 ctrlVec = new Vector4(vessel.ctrlState.X, vessel.ctrlState.Y, vessel.ctrlState.Z, vessel.ctrlState.mainThrottle);
             float rps = Mathf.Lerp(10f, 100f, (ctrlVec.magnitude * 0.5f));
             float step = rps * 1 / 30f;
@@ -221,7 +229,7 @@ public class GNcap : PartModule
 
         if (rotor)
         {
-            rotor.transform.localEulerAngles = new Vector3(0f, 0f, rotation);
+            rotor.transform.localEulerAngles = new Vector3(90f, 0f, rotation);
         }
 
         rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
@@ -277,11 +285,6 @@ public class GNcap : PartModule
         if (engineIgnited == false)
         {
             controlforce = Vector3.zero;
-            //Color set to zero while engineignited==false
-            color = new Vector4(0F, 0F, 0F, 1F);
-            rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-            stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-            stator.GetComponent<Light>().color = color;
         }
 
         double consumption = vessel.GetTotalMass() * Mathf.Abs((controlforce).magnitude) * fuelefficiency * TimeWarp.deltaTime;
@@ -327,15 +330,6 @@ public class GNcap : PartModule
                 }
             }
             //Color set to non-zero while engineignited==true
-            color = new Vector4(0F, 1F, 170F / 255F, 1F);
-            rotor.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-            stator.GetComponent<Renderer>().material.SetColor("_EmissiveColor", color);
-            stator.GetComponent<Light>().color = color;
-
-            rotor.transform.localEulerAngles = new Vector3(90, 0, rotation);
-            rotation += 6 * (Mathf.Clamp01(controlforce.magnitude / 100f) + 1) * 120 * TimeWarp.deltaTime;// * (1 + vessel.ctrlState.mainThrottle * rotermultiplier);Mathf.Abs(controlforce.magnitude),1/250*2.5/1=1/100
-            while (rotation > 360) rotation -= 360;
-            while (rotation < 0) rotation += 360;
         }
     }
 }
