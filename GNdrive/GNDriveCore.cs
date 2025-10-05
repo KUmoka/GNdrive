@@ -60,7 +60,7 @@ public class GNDriveCore : PartModule
 
 public class ParticleEmissionControl : PartModule
 {
-    // 調整用パラメータ（cfgから触れる）
+    // Adjustable parameters.
     [KSPField(guiActiveEditor = true, guiName = "Min Emission", isPersistant = true)]
     public float minimumEmission = 7000f;
 
@@ -68,7 +68,7 @@ public class ParticleEmissionControl : PartModule
     public float maximumEmission = 9000f;
 
     [KSPField(guiActiveEditor = true, guiName = "Bias", isPersistant = true)]
-    public float bias = 0.01f; // 常時わずかに出したい時の下駄
+    public float bias = 0.01f; //Base emission rate when no input.
 
     [KSPField(guiActiveEditor = true, guiName = "Throttle Weight", isPersistant = true)]
     public float throttleWeight = 1.0f;
@@ -77,17 +77,17 @@ public class ParticleEmissionControl : PartModule
     public float rcsWeight = 1.0f;
 
     [KSPField(guiActiveEditor = true, guiName = "Smoothing (1/s)", isPersistant = true)]
-    public float smoothRate = 8f; // 大きいほど追従が速い
+    public float smoothRate = 8f; //Larger value means faster response, For future use.
 
-    // 参照
+    //Treansform reference.
     private KSPParticleEmitter emitter;
-    private float currentMin, currentMax; // スムージング用
+    private float currentMin, currentMax; //For future use, for smoothing.
 
     public override void OnStart(StartState state)
     {
         base.OnStart(state);
 
-        // エミッタ取得（保険多め）
+        // get emitter reference, assume the transform name is "EMI".
         var tf = part.FindModelTransform("EMI");
         if (tf != null)
         {
@@ -98,7 +98,7 @@ public class ParticleEmissionControl : PartModule
         if (emitter == null)
         {
             Debug.LogWarning("[GN] ParticleEmissionControl: Emitter not found (EMI).");
-            enabled = false; // 以降のUpdateを止める（NRE回避）
+            enabled = false; //When error, disable this module.
             return;
         }
 
@@ -108,30 +108,31 @@ public class ParticleEmissionControl : PartModule
 
     public override void OnUpdate()
     {
-        // UI/見た目更新はOnUpdateでOK
+        // For visual, OnUpdate is enough.
         if (!HighLogic.LoadedSceneIsFlight || vessel == null || emitter == null) return;
 
-        // 入力の取得（ctrlStateは時々nullなので保険）
+        // get input state(sometimes, ctrlState is null).
         var cs = vessel.ctrlState;
         float throttle = 0f, rcsMag = 0f;
         if (cs != null)
         {
             throttle = Mathf.Clamp01(cs.mainThrottle);
 
-            // RCS 平行移動入力のベクトル長（0..1）で合成
-            // （回転RCSも混ぜたいなら pitch/yaw/roll も含めてOK）
+            // RCS vector magnitude
+            // RCS input is in the range of -1..1 for each axis, so.
+            // （if needs, pitch/yaw/roll should be added）
             Vector3 rcsVec = new Vector3(cs.X, cs.Y, cs.Z);
             rcsMag = Mathf.Clamp01(rcsVec.magnitude);
         }
 
-        // 重みづけ＋バイアス → 0..1 にクランプ
+        // weight and bias for clamp inputs.
         float drive01 = Mathf.Clamp01(throttle * throttleWeight + rcsMag * rcsWeight + bias);
 
-        // ターゲット値
+        // target emission rate.
         float targetMin = minimumEmission * drive01;
         float targetMax = maximumEmission * drive01;
 
-        // 反映（intに丸めるならMathf.RoundToInt）
+        // apply directly for now.
         emitter.minEmission = Mathf.RoundToInt(targetMin);
         emitter.maxEmission = Mathf.RoundToInt(targetMax);
     }
