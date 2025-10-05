@@ -27,9 +27,7 @@ public class Taudrive : PartModule
 
     //    public bool staged = false;
     public float particleSize = 0.001f;
-
     private float rotation = 0F;
-
     private GameObject rotor;
     private GameObject stator;
 

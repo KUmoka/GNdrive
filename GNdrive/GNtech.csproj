@@ -64,6 +64,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="GNDriveCore.cs" />
     <Compile Include="GNshield.cs" />
     <Compile Include="GNcap.cs" />
     <Compile Include="GNdriveTau.cs" />
