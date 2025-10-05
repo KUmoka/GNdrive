@@ -83,6 +83,9 @@ public class ParticleEmissionControl : PartModule
     private KSPParticleEmitter emitter;
     private float currentMin, currentMax; //For future use, for smoothing.
 
+    //private floats
+    private float fr = 600f;
+
     public override void OnStart(StartState state)
     {
         base.OnStart(state);
@@ -125,6 +128,10 @@ public class ParticleEmissionControl : PartModule
             rcsMag = Mathf.Clamp01(rcsVec.magnitude);
         }
 
+        // get current emitter rate.
+        currentMin = emitter.minEmission;
+        currentMax = emitter.maxEmission;
+
         // weight and bias for clamp inputs.
         float drive01 = Mathf.Clamp01(throttle * throttleWeight + rcsMag * rcsWeight + bias);
 
@@ -133,8 +140,8 @@ public class ParticleEmissionControl : PartModule
         float targetMax = maximumEmission * drive01;
 
         // apply directly for now.
-        emitter.minEmission = Mathf.RoundToInt(targetMin);
-        emitter.maxEmission = Mathf.RoundToInt(targetMax);
+        emitter.minEmission = emitter.minEmission + Mathf.RoundToInt(smoothRate * (targetMin - currentMin)/fr);
+        emitter.maxEmission = emitter.maxEmission + Mathf.RoundToInt(smoothRate * (targetMax - currentMax) /fr);
     }
 }
 
