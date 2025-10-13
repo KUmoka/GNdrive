@@ -213,8 +213,8 @@ public class GNcap : PartModule
         {
             color = new Vector4(0F, 1F, 170F / 255F, 1F);
             Vector4 ctrlVec = new Vector4(vessel.ctrlState.X, vessel.ctrlState.Y, vessel.ctrlState.Z, vessel.ctrlState.mainThrottle);
-            float rps = Mathf.Lerp(10f, 100f, (ctrlVec.magnitude * 0.5f));
-            float step = rps * 1 / 30f;
+            float rps = Mathf.Lerp(12f, 150f, (ctrlVec.magnitude * 0.5f));
+            float step = rps * 1 / 30f;//faster rotation.
             rotation += step;
             if (rotation >= 360f) rotation -= 360f;
             Emitter.emit = true;
