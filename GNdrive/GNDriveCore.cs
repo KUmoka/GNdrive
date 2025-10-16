@@ -37,7 +37,7 @@ namespace GNTechnology
         AudioClip soundClip;
         AudioSource audioSource;
 
-        public override void OnInitialize()
+        public override void OnStart(StartState state)
         {
             // initialize states.
             base.OnInitialize();
@@ -68,17 +68,13 @@ namespace GNTechnology
             ps.phaseShift = 0f;//to be set in derived classes.
             ps.particleOutputRate = ParticleRate;
 
-            // Unit specific setup, override in derived classes.
-            s.Mode = GNVisualMode.Condenser; // Default mode, can be changed in derived classes.
-            s.ParticleColor = new Color(1f, 0f, 0.15f, 1f);// Default color, can be changed in derived classes.
-        }
+            // Unit specific setup, override in derived classes.派生クラス固有の初期化（後述の virtual に逃がす）
+            ConfigureUnit(); // ★これを追加
 
-        public override void OnStart(StartState state)
-        {
-            base.OnStart(state);
+            // Final initialization.
             enabled = true;
             GNVisuals.UpdateVisual(s);//initialize. Is it necessary?
-            GNPhysics.UpdatePhysics(ps);//initialize. Is it necessary?
+            GNPhysics.UpdatePhysics(ref ps);//initialize. Is it necessary?
             SetupAudio();
 
             //When loaded in editor, turn off all visual effects.
@@ -93,22 +89,43 @@ namespace GNTechnology
 
         public override void OnUpdate()
         {
+            // When loaded in editor, turn off all visual effects.
+            if (HighLogic.LoadedSceneIsEditor)
+            {
+                GNVisuals.SetOff(s);
+                return;
+            }
+
+            // GNVisuals and audio update.
             base.OnUpdate();
             s.EngineState = engineOn;
-
-            //Audio for drive units.
             UpdateDriveAudio();
-
-            // GNVisuals update.
             GNVisuals.UpdateVisual(s);
         }
 
         public override void OnFixedUpdate()
         {
+            // When loaded in editor, turn off all visual effects.
+            if (HighLogic.LoadedSceneIsEditor)
+            {
+                GNPhysics.SetOff(ps);
+                return;
+            }
+
             // GNPhysics update.
             base.OnFixedUpdate();
             ps.flags = engineOn ? (ps.flags | GNFlags.Ignited) : (ps.flags & ~GNFlags.Ignited); // 条件式 ? trueのとき: falseのとき. memo : |=, &=, ~ are bitwise operators.
-            GNPhysics.UpdatePhysics(ps);
+            GNPhysics.UpdatePhysics(ref ps);
+        }
+
+        // Unit specific configuration, override in derived classes.
+        protected virtual void ConfigureUnit()
+        {
+            // 既定値（安全側）
+            s.Mode = GNVisualMode.Condenser;
+            s.ParticleColor = new Color(1f, 0f, 0.15f, 1f);
+            ps.maxG = 0f;
+            ps.phaseShift = 0f;
         }
 
         // Helper method to make lists of Transforms, Lights, Renderers, Emitters, etc.
@@ -216,27 +233,68 @@ namespace GNTechnology
 
     public class GNThrusterUnit : GNCommonUnit
     {
+        // This unit has partial drive functions.
         [KSPField]
         public int drivePower = 200;
+
+        // Override ConfigureUnit to set specific parameters for GNThrusterUnit
+        protected override void ConfigureUnit()
+        {
+            base.ConfigureUnit();
+            s.Mode = GNVisualMode.Drive;
+            s.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // 旧GNdrive相当
+            ps.maxG = 10f;  // 仮
+            ps.phaseShift = 0.0f; // 仮
+        }
     }
 
     public class GNCondenserDriveUnit : GNCommonUnit
     {
+        // This unit has drive functions.
         [KSPField]
         public int drivePower = 400;
 
+        // Anti-gravity toggle.
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "AntiGravity", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
+        public bool antiGravityOn = false;
+
+        // Override ConfigureUnit to set specific parameters for GNThrusterUnit
+        protected override void ConfigureUnit()
+        {
+            base.ConfigureUnit();
+            s.Mode = GNVisualMode.Drive;
+            s.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // 旧GNdrive相当
+            ps.maxG = 10f;  // 仮
+            ps.phaseShift = 0.0f; // 仮
+            ps.particleOutputRate = drivePower;
+        }
     }
 
     public class GNDriveTauUnit : GNCommonUnit
     {
+        // This unit has drive functions.
         [KSPField]
         public int drivePower = 1500;
 
-        public override void OnInitialize()
+        // Anti-gravity toggle.
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "AntiGravity", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
+        public bool antiGravityOn = false;
+
+        // Override ConfigureUnit to set specific parameters for GNThrusterUnit
+        protected override void ConfigureUnit()
         {
-            base.OnInitialize();
+            base.ConfigureUnit();
             s.Mode = GNVisualMode.Drive;
-            s.ParticleColor = new Color(1f, 0f, 0.16f, 1f);//Red for Tau drive.
+            s.ParticleColor = new Color(1f, 0f, 40f / 255f, 1f); // 旧GNdrive相当
+            ps.maxG = 10f;  // 仮
+            ps.phaseShift = 0.0f; // 仮
+            ps.particleOutputRate = drivePower;
+        }
+
+        public override void OnStart(StartState state)
+        {
+            base.OnStart(state);
+            s.Mode = GNVisualMode.Drive;
         }
 
         public override void OnUpdate()
@@ -250,17 +308,32 @@ namespace GNTechnology
 
     public class GNDriveUnit : GNCommonUnit
     {
-        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "TRANS-AM", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
-        public bool transamOn = false;
-
+        // This unit has drive functions.
         [KSPField]
         public int drivePower = 1000;
 
-        public override void OnInitialize()
-        { 
-            base.OnInitialize();
+        // TRANS-AM mode toggle.
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "TRANS-AM", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
+        public bool transamOn = false;
+
+        // Anti-gravity toggle.
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "AntiGravity", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
+        public bool antiGravityOn = false;
+
+        protected override void ConfigureUnit()
+        {
+            base.ConfigureUnit();
             s.Mode = GNVisualMode.Drive;
-            s.ParticleColor = new Color(0f, 1f, 0.6f, 1f);//green for normal drive.
+            s.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // 旧GNdrive相当
+            ps.maxG = 10f;  // 仮
+            ps.phaseShift = 0.0f; // 仮
+            ps.particleOutputRate = drivePower;
+        }
+
+        public override void OnStart(StartState state)
+        { 
+            base.OnStart(state);
+            s.Mode = GNVisualMode.Drive;
         }
 
         public override void OnUpdate()
@@ -269,16 +342,18 @@ namespace GNTechnology
             if (transamOn)
             {
                 s.ParticleColor = new Color(1F, 0F, 100F / 255F, 1F);//Red for Tau drive.
+                drivePower = 1000 * 3; //Triple 
             }
             else
             {
                 s.ParticleColor = new Color(0f, 1f, 0.6f, 1f);//green for normal drive.
+                drivePower = 1000;
             }
 
             if (false)// This code will use when Unsynchronization feature is implemented.so ignore error here.
             {
                 s.ParticleColor = new Color(0F, 1F / 4F, 42F / 255F, 1F);//Unsynchronized Color.
-                s.InputLevel = 0f; //unsynchronized, no input.
+                drivePower = 1;
 
             }
             else
@@ -291,100 +366,3 @@ namespace GNTechnology
         }
     }
 }
-
-public class ParticleEmissionControl : PartModule
-{
-    // Adjustable parameters.
-    [KSPField(guiActiveEditor = true, guiName = "Min Emission", isPersistant = true)]
-    public float minimumEmission = 7000f;
-
-    [KSPField(guiActiveEditor = true, guiName = "Max Emission", isPersistant = true)]
-    public float maximumEmission = 9000f;
-
-    [KSPField(guiActiveEditor = true, guiName = "Bias", isPersistant = true)]
-    public float bias = 0.01f; //Base emission rate when no input.
-
-    [KSPField(guiActiveEditor = true, guiName = "Throttle Weight", isPersistant = true)]
-    public float throttleWeight = 1.0f;
-
-    [KSPField(guiActiveEditor = true, guiName = "RCS Weight", isPersistant = true)]
-    public float rcsWeight = 1.0f;
-
-    [KSPField(guiActiveEditor = true, guiName = "Smoothing (1/s)", isPersistant = true)]
-    public float smoothRate = 8f; //Larger value means faster response, For future use.
-
-    //Treansform reference.
-    private KSPParticleEmitter emitter;
-    private float currentMin, currentMax; //For future use, for smoothing.
-
-    //private floats
-    private float fr = 600f;
-
-    public override void OnStart(StartState state)
-    {
-        base.OnStart(state);
-
-        // get emitter reference, assume the transform name is "EMI".
-        var tf = part.FindModelTransform("EMI");
-        if (tf != null)
-        {
-            emitter = tf.GetComponent<KSPParticleEmitter>();
-            if (emitter == null)
-                emitter = tf.GetComponentInChildren<KSPParticleEmitter>(true);
-        }
-        if (emitter == null)
-        {
-            Debug.LogWarning("[GN] ParticleEmissionControl: Emitter not found (EMI).");
-            enabled = false; //When error, disable this module.
-            return;
-        }
-
-        currentMin = emitter.minEmission;
-        currentMax = emitter.maxEmission;
-    }
-
-    public override void OnUpdate()
-    {
-        // For visual, OnUpdate is enough.
-        if (!HighLogic.LoadedSceneIsFlight || vessel == null || emitter == null) return;
-
-        // get input state(sometimes, ctrlState is null).
-        var cs = vessel.ctrlState;
-        float throttle = 0f, rcsMag = 0f;
-        if (cs != null)
-        {
-            throttle = Mathf.Clamp01(cs.mainThrottle);
-
-            // RCS vector magnitude
-            // RCS input is in the range of -1..1 for each axis, so.
-            // （if needs, pitch/yaw/roll should be added）
-            Vector3 rcsVec = new Vector3(cs.X, cs.Y, cs.Z);
-            rcsMag = Mathf.Clamp01(rcsVec.magnitude);
-        }
-
-        // get current emitter rate.
-        currentMin = emitter.minEmission;
-        currentMax = emitter.maxEmission;
-
-        // weight and bias for clamp inputs.
-        float drive01 = Mathf.Clamp01(throttle * throttleWeight + rcsMag * rcsWeight + bias);
-
-        // target emission rate.
-        float targetMin = minimumEmission * drive01;
-        float targetMax = maximumEmission * drive01;
-
-        // apply directly for now.
-        emitter.minEmission = emitter.minEmission + Mathf.RoundToInt(smoothRate * (targetMin - currentMin) / fr);
-        emitter.maxEmission = emitter.maxEmission + Mathf.RoundToInt(smoothRate * (targetMax - currentMax) / fr);
-    }
-}
-
-//cache visual parts will be added here.
-//handy method for get rotor transforms.
-//Debug.Log("[GN] GNCondenserUnit OnStart Run");
-//var all = part.transform.GetComponentsInChildren<Transform>(true);
-//foreach (var t in all)
-//{
-//    if (t.name.Contains("rotor")) Debug.Log("[GN] T:" + t.name);
-//}
-
