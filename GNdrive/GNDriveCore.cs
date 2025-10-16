@@ -9,11 +9,28 @@ using UnityEngine;
 
 namespace GNTechnology
 {
-    public class GNCommonUnit : PartModule//Base class for GN units.Update-related things should be done here.
+    public class GNCommonUnit : PartModule // Base class for GN units.Update-related things should be done here.
     {
         // Visual and Physics states.
         protected GNVisualState s = GNVisualState.Empty;
         protected GNPhysicalState ps = GNPhysicalState.Empty;
+
+        // KSPFieldでチューニング可能に（cfgから上書き）
+        [KSPField(guiActiveEditor = true, guiName = "Overload", isPersistant = true)]
+        public float Overload = 1f;
+
+        [KSPField(guiActiveEditor = true, guiName = "FuelEff", isPersistant = true)]
+        public float FuelEff = 1f;
+
+        [KSPField(guiActiveEditor = true, guiName = "ParticleRate", isPersistant = true)]
+        public float ParticleRate = 0f;
+
+        [KSPField(guiActiveEditor = true, guiName = "Max Sync Engines", isPersistant = true)]
+        public int MaxSyncEngines = 0;
+
+        // KSP field for drive control.
+        [KSPField(guiActive = true, guiName = "Engine State", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
+        public bool engineOn = false;
 
         //variables for audio.
         [KSPField] public string audioPath = "GNdrive/Audio/GNDriveTypical";
@@ -34,8 +51,7 @@ namespace GNTechnology
             List<KSPParticleEmitter> listE = new List<KSPParticleEmitter>();
             MakeLists(listT, listL, listR, listE);//Make lists of parts here.
 
-            //setup necessary basic TransForms, Renderers, etc here.
-            //Visual state setup.
+            //Visual state setup.setup necessary basic TransForms, Renderers, etc here.
             s.part = part;
             s.Rotors = listT.ToArray();
             s.EmissiveRenderers = listR.ToArray();
@@ -44,14 +60,58 @@ namespace GNTechnology
             s.EngineState = false;
             s.InputLevel = 0f;
 
-            //Physical state setup.
+            //Physics state setup.
             ps.part = part;
+            ps.fuelEfficiency = FuelEff;
+            ps.maxG = 0f; //to be set in derived classes.
+            ps.flags = GNFlags.None;
+            ps.phaseShift = 0f;//to be set in derived classes.
+            ps.particleOutputRate = ParticleRate;
 
             // Unit specific setup, override in derived classes.
             s.Mode = GNVisualMode.Condenser; // Default mode, can be changed in derived classes.
             s.ParticleColor = new Color(1f, 0f, 0.15f, 1f);// Default color, can be changed in derived classes.
         }
 
+        public override void OnStart(StartState state)
+        {
+            base.OnStart(state);
+            enabled = true;
+            GNVisuals.UpdateVisual(s);//initialize. Is it necessary?
+            GNPhysics.UpdatePhysics(ps);//initialize. Is it necessary?
+            SetupAudio();
+
+            //When loaded in editor, turn off all visual effects.
+            if (HighLogic.LoadedSceneIsEditor)
+            {
+                GNVisuals.SetOff(s);
+                GNPhysics.SetOff(ps);
+                Debug.Log("[GN] Visuals set to OFF in editor.");
+                return;
+            }
+        }
+
+        public override void OnUpdate()
+        {
+            base.OnUpdate();
+            s.EngineState = engineOn;
+
+            //Audio for drive units.
+            UpdateDriveAudio();
+
+            // GNVisuals update.
+            GNVisuals.UpdateVisual(s);
+        }
+
+        public override void OnFixedUpdate()
+        {
+            // GNPhysics update.
+            base.OnFixedUpdate();
+            ps.flags = engineOn ? (ps.flags | GNFlags.Ignited) : (ps.flags & ~GNFlags.Ignited); // 条件式 ? trueのとき: falseのとき. memo : |=, &=, ~ are bitwise operators.
+            GNPhysics.UpdatePhysics(ps);
+        }
+
+        // Helper method to make lists of Transforms, Lights, Renderers, Emitters, etc.
         private void MakeLists(List<Transform> listT, List<Light> listL, List<Renderer> listR, List<KSPParticleEmitter> listE)
         {
             // Make lists of Lights, Renderers, Emitters, etc. here if needed.
@@ -83,26 +143,7 @@ namespace GNTechnology
 
         }
 
-        public override void OnStart(StartState state)
-        {
-            base.OnStart(state);
-            // Common initialization code for GN units can be added here.
-            // make GNVisuals and GNPhysics ready for future use.
-            // Also setup AudioSource if needed.
-            // In Editor, always should be on so enabled = true
-            enabled = true;
-            GNVisuals.UpdateVisual(s);//initialize. Is it necessary?
-            SetupAudio();
-
-            //When loaded in editor, turn off all visual effects.
-            if (HighLogic.LoadedSceneIsEditor)
-            {
-                GNVisuals.SetOff(s);
-                Debug.Log("[GN] Visuals set to OFF in editor.");
-                return;
-            }
-        }
-
+        // Audio setup method.
         private void SetupAudio()
         {
             try
@@ -148,56 +189,48 @@ namespace GNTechnology
             }
         }
 
-        public override void OnUpdate()
+        // Audio update method.
+        private void UpdateDriveAudio()
         {
-            base.OnUpdate();
-            // GNVisuals update.
-            
-            //Audio for drive units.
-            if (audioSource != null)
+            if (audioSource == null) return;
+
+            bool paused = PauseMenu.isOpen || Time.timeScale == 0;
+            bool isCondenserMode = s.Mode == GNVisualMode.Condenser;
+            bool engineOff = !s.EngineState;
+
+            bool shouldPlay = !(paused || isCondenserMode || engineOff);
+
+            if (shouldPlay)
             {
-                // Play sound only when it's not condense, the engine is active and not paused.
-                bool shouldPlay = !(PauseMenu.isOpen || Time.timeScale == 0 || s.Mode == GNVisualMode.Condenser || !s.EngineState);
-
-                if (shouldPlay)
-                {
-                    if (!audioSource.isPlaying) audioSource.Play();
-                    audioSource.volume = 1.0f;
-                    audioSource.pitch = 1.0f;
-                }
-                else
-                {
-                    if (audioSource.isPlaying) audioSource.Stop();
-                    audioSource.volume = 0f;
-                }
+                if (!audioSource.isPlaying) audioSource.Play();
+                audioSource.volume = 1.0f;
+                audioSource.pitch = 1.0f;
             }
-
-            GNVisuals.UpdateVisual(s);
-        }
-
-        public override void OnFixedUpdate()
-        {
-            base.OnFixedUpdate();
-            // GNPhysics update.
-
+            else
+            {
+                if (audioSource.isPlaying) audioSource.Stop();
+                audioSource.volume = 0f;
+            }
         }
     }
 
     public class GNThrusterUnit : GNCommonUnit
     {
-
+        [KSPField]
+        public int drivePower = 200;
     }
 
     public class GNCondenserDriveUnit : GNCommonUnit
     {
-        
+        [KSPField]
+        public int drivePower = 400;
+
     }
 
     public class GNDriveTauUnit : GNCommonUnit
     {
-        //Just for testing purpose.
-        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "Engine ON", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
-        public bool engineOn = false;
+        [KSPField]
+        public int drivePower = 1500;
 
         public override void OnInitialize()
         {
@@ -217,13 +250,11 @@ namespace GNTechnology
 
     public class GNDriveUnit : GNCommonUnit
     {
-        //Just for testing purpose.
-        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "Engine ON", isPersistant = true),UI_Toggle(disabledText = "OFF", enabledText = "ON")]
-        public bool engineOn = false;
-        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "TRANS-AM ON", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "TRANS-AM", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
         public bool transamOn = false;
-        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "UnSynchronized", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
-        public bool unSync = false;
+
+        [KSPField]
+        public int drivePower = 1000;
 
         public override void OnInitialize()
         { 
@@ -244,7 +275,7 @@ namespace GNTechnology
                 s.ParticleColor = new Color(0f, 1f, 0.6f, 1f);//green for normal drive.
             }
 
-            if (unSync)
+            if (false)// This code will use when Unsynchronization feature is implemented.so ignore error here.
             {
                 s.ParticleColor = new Color(0F, 1F / 4F, 42F / 255F, 1F);//Unsynchronized Color.
                 s.InputLevel = 0f; //unsynchronized, no input.

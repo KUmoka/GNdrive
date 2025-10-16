@@ -1,33 +1,226 @@
 ﻿using KSP;
 using System;
+using System.Linq;
 using UnityEngine;
 
 namespace GNTechnology
 {
-    public struct GNPhysicalState
+    [Flags]
+    public enum GNFlags : uint
     {
-        public Part part;
-        public double ResourceRatio;
-        public bool EngineActive;
-        public bool AntiGravityActive;
-        public bool TransAmActive;
-
-        public static GNPhysicalState Empty => new GNPhysicalState
-        {
-            ResourceRatio = 0,
-            EngineActive = false,
-            AntiGravityActive = false,
-            TransAmActive = false
-        };
+        None = 0,
+        Ignited = 1 << 0, // Engine On/Off
+        AntiGravity = 1 << 1, // Antigravity On/Off
+        Hover = 1 << 2, // Hover mode On/Off
+        TransAM = 1 << 3, // Trans-AM mode On/Off
+        InertiaControl = 1 << 4, // Future Use
+        Modified = 1 << 5, // Future Use
     }
 
-    public static class GNPhysics  //Using in FixedUpdate of PartModule
+    public struct GNPhysicalState
+    {
+        public Part part;            // 対象パーツ（必須）
+        public GNFlags flags;        // まとめて渡す
+
+        // チューニング・入力（必要に応じて増やせる）
+        public float fuelEfficiency; // 消費係数
+        public float particleOutputRate;   // 生成(or 変換)レート
+        public float maxG; // Target G for Full throttle, if ship is too heavy, actual G will be lower.
+        public float phaseShift; // For Twin-drive Sync rate.
+
+        public static GNPhysicalState Empty => new GNPhysicalState { part = null, flags = GNFlags.None, fuelEfficiency = 0f, particleOutputRate = 0f, maxG = 0f, phaseShift = 0f };
+    }
+
+    public static class GNPhysics
     {
         public static void SetOff(in GNPhysicalState ps)
         {
-            if (ps.part == null) return;
+            if (ps.part == null) return;//part is required.
+
+        }
+
+        // Every FixedUpdate
+        public static void UpdatePhysics(in GNPhysicalState ps)
+        {
+            // for TRANS-AM
+            var actualParticleOutputMultiplier = 1f;
+            var geeMultiplier = 0f;
+            var driveCount = 0;
+            var ignitedCount = 0;
+            var agCount = 0;
+
+            // is this drive on? -> no,return, yes, continue
+            if (ps.flags != GNFlags.Ignited) return;
+
+            // is TRANS-AM on? -> output 3x power(particle rate 3x)
+            if (ps.flags != GNFlags.TransAM )
+            {
+                actualParticleOutputMultiplier = 3f;
+            }
+
+            // is hover on? -> PID control vertical speed to 0
+            if (ps.flags == GNFlags.Hover)
+            {
+                // PID control vertical speed to 0
+            }
+
+            // is Antigravity on? -> cancel gravity(-gee), if hover on, AG should be disabled. Now count how many antigravity-on drives in vessel? -> -gee/agCount, if agCount=0, no -gee
+            if (ps.flags == GNFlags.AntiGravity)
+            {
+                geeMultiplier = 1f;// normal AG
+                foreach (Part p in this.vessel.Parts)
+                {
+                    foreach (PartModule m in p.Modules)
+                    {
+                        ProtoTaudrive drive = null;
+                        ProtoGNdrive gdrive = null;
+                        if (m.moduleName == "ProtoTaudrive")
+                        {
+                            drive = (ProtoTaudrive)m;
+                            if (drive.agActivated == true)
+                            {
+                                enginecount += 1;
+                            }
+                        }
+                        else
+                            if (m.moduleName == "ProtoGNdrive")
+                        {
+                            gdrive = (ProtoGNdrive)m;
+                            if (gdrive.agActivated == true)
+                            {
+                                enginecount += 1;
+                            }
+                        }
+                        //四種類のドライブを全部探して、AGがONの数を数えてそれぞれのドライブパワーを足す
+                    }
+                }
+            }
+            
+            
+
+            // calculate total drivePower. find every GNDrive/GNDriveTau/GNCondenserDrive/GNThruster -> sum <drives>.drivePower.
+            // calculate total mass of vessel -> vessel.GetTotalMass()
+            // calculate acceleration = totalDrivePower(m/s * kg/s)/totalMass(kg) -> m/s^2
+            // calculate forceDirection = vessel.ReferenceTransform.up * (vessel.ctrlState.mainThrottle - vessel.ctrlState.Z) + vessel.ReferenceTransform.forward * (-vessel.ctrlState.Y) + vessel.ReferenceTransform.right * (-vessel.ctrlState.X);
+            // apply acceleration to every part in vessel -> part.AddForce(acceleration * part.rb.mass * forceDirection)
+            // apply -gee to every part in vessel -> part.AddForce(-gee * part.rb.mass / agCount) gee = FlightGlobals.getGeeForceAtPosition(this.vessel.transform.position)
+
+        }
+
+
+        public static void Update(ref GNPhysicalState ps)
+        {
+            if (!ps.initialized || ps.part == null) return;
+            var vessel = ps.vessel ?? ps.part.vessel;
+            if (vessel == null || !HighLogic.LoadedSceneIsFlight || !vessel.isActiveVessel) return;
+
+            // --- 入力の取り出し
+            var cs = vessel.ctrlState;
+            float x = -cs.X * ps.overload * 10f;
+            float y = -cs.Y * ps.overload * 10f;
+            float z = (cs.mainThrottle - cs.Z) * ps.overload * 10f;
+
+            // --- 重力ベクトル（1基あたり割り）
+            int agCount = CountEnginesWithFlag(vessel, GNFlags.AntiGravity);
+            Vector3 gee = FlightGlobals.getGeeForceAtPosition(vessel.transform.position);
+            if (agCount > 0) gee /= agCount;
+
+            // --- 基本制御力
+            Vector3 control =
+                vessel.ReferenceTransform.up * z +
+                vessel.ReferenceTransform.forward * y +
+                vessel.ReferenceTransform.right * x;
+
+            // --- Hover（垂直速度打消し）
+            if (Has(ps.flags, GNFlags.AntiGravity) && Has(ps.flags, GNFlags.Hover))
+            {
+                float vVert = Vector3.Dot(gee.normalized, ps.part.rb.velocity);
+                ps.hoverPid.Calibrateclamp(ps.overload);
+                Vector3 cancel = ps.hoverPid.Control(vVert) * gee.normalized * 10f / Mathf.Max(1, agCount);
+                control -= cancel;
+            }
+
+            // --- Trans-AMブースト
+            float teFactor = 1f;
+            if (Has(ps.flags, GNFlags.TransAM))
+            {
+                control *= 5f;
+                teFactor = Mathf.Max(1f, Mathf.Pow(ps.particleRate, Mathf.Max(0, CountIgnited(vessel) - 1)));
+            }
+
+            // --- 同期制限（必要ならカット）
+            int ignitedCount = CountIgnited(vessel);
+            if (ps.maxSyncEngines > 0 && ignitedCount > ps.maxSyncEngines)
+            {
+                control = Vector3.zero;
+                gee = Vector3.zero;
+                teFactor = 0.001f;
+            }
+
+            // --- フラグで出力制御
+            if (!Has(ps.flags, GNFlags.Ignited)) control = Vector3.zero;
+            if (!Has(ps.flags, GNFlags.AntiGravity)) gee = Vector3.zero;
+
+            // --- リソース計算（GN 消費と生成）
+            float mass = vessel.GetTotalMass();
+            float accelMag = (-gee + control).magnitude;
+
+            // 消費 [units/s] ≒ m * |a| * η
+            float consumption = mass * Mathf.Abs(accelMag) * ps.fuelEfficiency;
+
+            // 生成／変換（TransAM時は最低生成量を粒子レート×teFactorまで引き上げる例）
+            float particleGen = Has(ps.flags, GNFlags.TransAM) ? ps.particleRate * teFactor : 0f;
+
+            // 実リクエスト（Δt倍）
+            double delta = TimeWarp.fixedDeltaTime;
+            double requested = (consumption - particleGen) * delta;
+
+            // GNparticle残量反映
+            double drawn = ps.part.RequestResource("GNparticle", requested);
+
+            // 枯渇時は停止
+            if (requested > 0 && Math.Round(drawn, 5) < Math.Round(requested, 5))
+            {
+                Set(ref ps, GNFlags.Ignited, false);
+                Set(ref ps, GNFlags.AntiGravity, false);
+                Set(ref ps, GNFlags.TransAM, false);
+                control = Vector3.zero;
+                gee = Vector3.zero;
+            }
+
+            // --- 力を各Partに加える（KSPのAddForceはパーツ質量でスケール）
+            if (Has(ps.flags, GNFlags.Ignited))
+            {
+                foreach (var p in vessel.parts)
+                    if (p.physicalSignificance == Part.PhysicalSignificance.FULL && p.rb != null)
+                        p.AddForce(control * p.rb.mass);
+            }
+            if (Has(ps.flags, GNFlags.AntiGravity))
+            {
+                foreach (var p in vessel.parts)
+                    if (p.physicalSignificance == Part.PhysicalSignificance.FULL && p.rb != null)
+                        p.AddForce(-gee * p.rb.mass);
+            }
+
+            // --- 慣性制御（簡易版のフック。必要ならここを拡張）
+            if (Has(ps.flags, GNFlags.InertiaControl))
+            {
+                // 例：将来ここでターゲット追従力をcontrolに加算する
+                // ps.part.vessel.targetObject ... を参照して拡張
+            }
+
+            // --- スモークテスト：常に上向きに +5 m/s^2 をかける
+            foreach (var p in ps.vessel.parts)
+            {
+                if (p.physicalSignificance == Part.PhysicalSignificance.FULL && p.rb != null)
+                {
+                    // 質量を無視して加速度指定（ForceMode.Acceleration）
+                    p.rb.AddForce(Vector3.up * 5f, ForceMode.Acceleration);
+                }
+            }
         }
     }
+
 }
 
 namespace GNTechnology
@@ -205,20 +398,20 @@ namespace GNTechnology
             {
                 foreach (PartModule m in p.Modules)
                 {
-                    Taudrive drive = null;
-                    GNdrive gdrive = null;
-                    if (m.moduleName == "Taudrive")
+                    ProtoTaudrive drive = null;
+                    ProtoGNdrive gdrive = null;
+                    if (m.moduleName == "ProtoTaudrive")
                     {
-                        drive = (Taudrive)m;
+                        drive = (ProtoTaudrive)m;
                         if (drive.agActivated == true)
                         {
                             enginecount += 1;
                         }
                     }
                     else
-                        if (m.moduleName == "GNdrive")
+                        if (m.moduleName == "ProtoGNdrive")
                     {
-                        gdrive = (GNdrive)m;
+                        gdrive = (ProtoGNdrive)m;
                         if (gdrive.agActivated == true)
                         {
                             enginecount += 1;

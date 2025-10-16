@@ -56,13 +56,13 @@ namespace GNTechnology
         {
             if (s.part == null)
             { 
-                Debug.LogError("[GN] GNVisualState.part is null!");
+                //Debug.LogError("[GN] GNVisualState.part is null!");
                 return; 
             }
 
             if (!s.EngineState && s.Mode == GNVisualMode.Drive)
             {
-                Debug.Log("[GN] Engine is off. Stop all visual effects.");
+                //Debug.Log("[GN] Engine is off. Stop all visual effects.");
                 UpdateRotor(s.Rotors, 0f);
                 UpdateGlow(s.EmissiveRenderers, s.GlowLights, s.ParticleColor, 0f);
                 UpdateParticle(s.ParticleEmitters, s.ParticleColor, 0f);
@@ -144,7 +144,7 @@ namespace GNTechnology
             {
                 var e = emitters[i];
                 if (!e) continue;
-                Debug.Log("[GN] ParticleEmitter found.");
+                //Debug.Log("[GN] ParticleEmitter found.");
 
                 // Smoothly adjust emission rates
                 e.enabled = true;
