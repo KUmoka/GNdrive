@@ -3,177 +3,83 @@ using KSP;
 using System;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace GNTechnology
 {
-    [Flags]
-    public enum GNFlags : uint
+    public struct GNPhysicsState
     {
-        None = 0,
-        Ignited = 1 << 0, // Engine On/Off
-        AntiGravity = 1 << 1, // Antigravity On/Off
-        Hover = 1 << 2, // Hover mode On/Off
-        TransAM = 1 << 3, // Trans-AM mode On/Off
-        InertiaControl = 1 << 4, // Future Use
-        Modified = 1 << 5, // Future Use
-    }
+        public Part part;
+        public bool EngineState;
+        public bool AgOn;
+        public bool HvOn;
+        public bool TaOn;
+        public bool UnSync;
+        public float ParticlePower;
+        public float MaxG;
 
-    public struct GNPhysicalState
-    {
-        public Part part;            // 対象パーツ（必須）
-        public GNFlags flags;        // まとめて渡す
-
-        // チューニング・入力（必要に応じて増やせる）
-        public float fuelEfficiency; // 消費係数
-        public float particleOutputRate;   // 生成(or 変換)レート
-        public float maxG; // Target G for Full throttle, if ship is too heavy, actual G will be lower.
-        public float phaseShift; // For Twin-drive Sync rate.
-
-        public static GNPhysicalState Empty => new GNPhysicalState { part = null, flags = GNFlags.None, fuelEfficiency = 0f, particleOutputRate = 0f, maxG = 0f, phaseShift = 0f };
+        public static GNPhysicsState Empty => new GNPhysicsState
+        {
+            EngineState = false,
+            AgOn = false,
+            HvOn = false,
+            TaOn = false,
+            UnSync = false,
+            ParticlePower = 0f,
+            MaxG = 0f
+        };
     }
 
     public static class GNPhysics
     {
-        public static void SetOff(in GNPhysicalState ps)
+        public static void SetOff(in GNPhysicsState ps)
         {
-            if (ps.part == null) return;//part is required.
-
+            if (ps.part == null) return;
         }
 
-        // Every FixedUpdate
-        public static void UpdatePhysics(ref GNPhysicalState ps)
+        public static void UpdatePhysics(in GNPhysicsState ps)
         {
-            // sanity check
-            var Vessel = ps.part.vessel;
-            var resDef = PartResourceLibrary.Instance.GetDefinition("GNparticle");
-            if (resDef == null) return;
+            Vessel Vessel = ps.part.vessel;
+            float throttle = Vessel.ctrlState.mainThrottle;
+            float y = -Vessel.ctrlState.Y;
+            float x = -Vessel.ctrlState.X;
+            float z = -Vessel.ctrlState.Z;
+            float actualG = ps.MaxG * 9.8f;//convert to m/s^2
+            float norm = Mathf.Sqrt(x * x + y * y + (z + throttle) * (z + throttle));
+            int driveCount = 0;
 
-            // local variables
-            var totalDrivePower = 0f;
-            var agCount = 0;
-            var thrusterCount = 0;
-            float acceleration = 0f;
-            var particleDrain = 0f;
-            Vector3 forceDirection = Vector3.zero;
+            if (norm < 1e-6f) norm = 1f; // avoid division by zero
 
-            // is this drive on? -> no,return, yes, continue
-            if (ps.part == null || ps.part.vessel == null) return;
+            //Vectors
+            Vector3 ThrustDirection = Vessel.ReferenceTransform.up * (z + throttle) / norm + Vessel.ReferenceTransform.forward * y / norm + Vessel.ReferenceTransform.right * x / norm;
+            Vector3 gee = FlightGlobals.getGeeForceAtPosition(Vessel.transform.position);
 
-            // is TRANS-AM on? -> output 3x power(particle rate 3x)
-            // part module triples output so ignore here.
 
-            // is hover on? -> PID control vertical speed to 0
-            if (ps.flags == GNFlags.Hover)
-            {
-                // PID control vertical speed to 0
-            }
+            Debug.Log("[GN] norm: " + norm);
 
-            // Count how many antigravity-on drives in vessel? -> -gee/agCount, if agCount=0, no -gee
-            // calculate total drivePower. find every GNDrive/GNDriveTau/GNCondenserDrive/GNThruster -> sum <drives>.drivePower.
-            // thrusterCount is used to average force when apply to parts.
+            if (ps.part == null) return;
+            if (!HighLogic.LoadedSceneIsFlight || !Vessel.isActiveVessel) return; // 流用
+
+            // Drive count
             foreach (Part p in Vessel.parts)
             {
-                foreach (PartModule m in p.Modules)
-                {
-                    if (m is GNDriveUnit drive)
-                    {
-                        if (drive.engineOn) { totalDrivePower += drive.drivePower; thrusterCount++; }
-                        if (drive.antiGravityOn) agCount++;
-                    }
-                    else if (m is GNDriveTauUnit drivetau)
-                    {
-                        if (drivetau.engineOn) { totalDrivePower += drivetau.drivePower; thrusterCount++; }
-                        if (drivetau.antiGravityOn) agCount++;
-                    }
-                    else if (m is GNCondenserDriveUnit condenser)
-                    {
-                        if (condenser.engineOn) { totalDrivePower += condenser.drivePower; thrusterCount++; }
-                        if (condenser.antiGravityOn) agCount++;
-                    }
-                    else if (m is GNThrusterUnit thruster)
-                    {
-                        if (thruster.engineOn) { totalDrivePower += thruster.drivePower; thrusterCount++; }
-                    }
-                }
+                // drive count logic here
             }
 
-            // if thrusterCount=0 and agCount=0, return.
-            if (thrusterCount == 0 && agCount == 0) return;
-
-            // calculate total mass of vessel -> vessel.GetTotalMass()
-            // calculate acceleration = totalDrivePower(m/s * kg/s)/totalMass(kg) -> m/s^2
-            double totalMassKg = Vessel.GetTotalMass() * 1000.0;
-            acceleration = (float)(totalMassKg > 0.0 ? (totalDrivePower * 1000 / totalMassKg) : 0f);
-            if (ps.maxG > 0f && acceleration > ps.maxG) acceleration = ps.maxG;
-
-            // calculate forcedirection = up*(throttle-Z)+forward*(-Y)+right*(-X)
-            forceDirection = Vessel.ReferenceTransform.up * (Vessel.ctrlState.mainThrottle - Vessel.ctrlState.Z) + Vessel.ReferenceTransform.forward * (-Vessel.ctrlState.Y) + Vessel.ReferenceTransform.right * (-Vessel.ctrlState.X);
-            if (forceDirection.sqrMagnitude > 1e-6f) forceDirection.Normalize();
-
-            // calculate particle consumption = vessel.GetTotalMass() * acceleration * fuelEfficiency
-            double particleDrainPerSec = (totalMassKg * acceleration * ps.fuelEfficiency * 0.001); // 単位は好きに定義
-            double stepDemand = particleDrainPerSec * TimeWarp.fixedDeltaTime;
-            if (stepDemand > 0)
+                // Force application
+            foreach (Part p in Vessel.parts)
             {
-                // Vessel全体から消費（ID指定）
-                double taken = Vessel.RequestResource(ps.part, resDef.id, stepDemand, true);
-                if (taken < stepDemand * 0.1) // 足りないなら停止など
-                {
-                    ps.flags &= ~GNFlags.Ignited;
-                    return;
-                }
-            }
-            //particleDrain = Vessel.GetTotalMass() * acceleration * ps.fuelEfficiency;
-            //Vessel.RequestResource(ps.part, resDef.id, particleDrain * TimeWarp.fixedDeltaTime, true);
 
-            // apply acceleration to every part in vessel -> part.AddForce((acceleration/thrusterCount)*part.rb.mass*forceDirection)
-            if (thrusterCount > 0 && forceDirection.sqrMagnitude > 0)
-            {
-                foreach (Part part in Vessel.parts)
+                if ((p.physicalSignificance == Part.PhysicalSignificance.FULL) && (p.rb != null))
                 {
-                    if (part.physicalSignificance == Part.PhysicalSignificance.FULL && part.rb != null)
-                    {
-                        // F = m * a / 台数
-                        Vector3 force = (acceleration / thrusterCount) * part.rb.mass * forceDirection;
-                        part.AddForce(force);
-                    }
+                    p.AddForce(ThrustDirection * actualG * p.rb.mass);
+                    if (ps.AgOn) p.AddForce(-gee * p.rb.mass);
                 }
+
             }
 
-            if (((ps.flags & GNFlags.AntiGravity) != 0) && agCount > 0)
-            {
-                Vector3 gee = FlightGlobals.getGeeForceAtPosition(Vessel.transform.position); // N/kg（≒ m/s^2） * kg でNに
-                foreach (Part part in Vessel.parts)
-                {
-                    if (part.physicalSignificance == Part.PhysicalSignificance.FULL && part.rb != null)
-                    {
-                        // AGドライブ数で割って相殺量を分配（thrusterCountでは割らない）
-                        Vector3 anti = -(gee / agCount) * part.rb.mass;
-                        part.AddForce(anti);
-                    }
-                }
-            }
-            //foreach (Part part in Vessel.parts)
-            //{
-            //    if (part.physicalSignificance == Part.PhysicalSignificance.FULL && part.rb != null)
-            //    {
-            //        part.AddForce((acceleration / thrusterCount) * part.rb.mass * forceDirection);
-            //    }
-            //}
-            // if agCount>0, get gee vector at vessel position -> -gee/agCount
-            // apply -gee to every part in vessel -> part.AddForce(-gee * part.rb.mass / agCount) gee = FlightGlobals.getGeeForceAtPosition(this.vessel.transform.position)
-            //if (agCount > 0)
-            //{
-            //    Vector3 gee = FlightGlobals.getGeeForceAtPosition(Vessel.transform.position) / agCount;
-            //    foreach (Part part in Vessel.parts)
-            //    {
-            //        if (part.physicalSignificance == Part.PhysicalSignificance.FULL && part.rb != null)
-            //        {
-            //            part.AddForce(-gee / thrusterCount * part.rb.mass);
-            //        }
-            //    }
-            //}
         }
+        
     }
 }
 
@@ -1161,6 +1067,160 @@ namespace GNTechnology
 //                    }
 //                }
 //                controlforce += (InertiaForce) / Time.fixedDeltaTime / enginecount;
+//            }
+//        }
+//    }
+//}
+
+//[Flags]
+//public enum GNFlags : uint
+//{
+//    None = 0,
+//    Ignited = 1 << 0, // Engine On/Off
+//    AntiGravity = 1 << 1, // Antigravity On/Off
+//    Hover = 1 << 2, // Hover mode On/Off
+//    TransAM = 1 << 3, // Trans-AM mode On/Off
+//    InertiaControl = 1 << 4, // Future Use
+//    Modified = 1 << 5, // Future Use
+//}
+
+//public struct GNPhysicalState
+//{
+//    public Part part;            // 対象パーツ（必須）
+//    public GNFlags flags;        // まとめて渡す
+
+//    // チューニング・入力（必要に応じて増やせる）
+//    public float fuelEfficiency; // 消費係数
+//    public float particleOutputRate;   // 生成(or 変換)レート
+//    public float maxG; // Target G for Full throttle, if ship is too heavy, actual G will be lower.
+//    public float phaseShift; // For Twin-drive Sync rate.
+
+//    public static GNPhysicalState Empty => new GNPhysicalState { part = null, flags = GNFlags.None, fuelEfficiency = 0f, particleOutputRate = 0f, maxG = 0f, phaseShift = 0f };
+//}
+
+//public static class GNPhysics
+//{
+//    public static void SetOff(in GNPhysicalState ps)
+//    {
+//        if (ps.part == null) return;//part is required.
+
+//    }
+
+//    // Every FixedUpdate
+//    public static void UpdatePhysics(ref GNPhysicalState ps)
+//    {
+//        // sanity check
+//        var Vessel = ps.part.vessel;
+//        var resDef = PartResourceLibrary.Instance.GetDefinition("GNparticle");
+//        Debug.Log("[GN] GNPhysics UpdatePhysics Run Resource id:" + resDef);
+//        //if (resDef == null) return;
+
+//        // local variables
+//        var totalDrivePower = 0f;
+//        var agCount = 0;
+//        var thrusterCount = 0;
+//        float acceleration = 0f;
+//        var particleDrain = 0f;
+//        Vector3 forceDirection = Vector3.zero;
+
+//        // is this drive on? -> no,return, yes, continue
+//        if (ps.part == null || ps.part.vessel == null) return;
+
+//        // is TRANS-AM on? -> output 3x power(particle rate 3x)
+//        // part module triples output so ignore here.
+
+//        // is hover on? -> PID control vertical speed to 0
+//        if (ps.flags == GNFlags.Hover)
+//        {
+//            // PID control vertical speed to 0
+//        }
+
+//        // Count how many antigravity-on drives in vessel? -> -gee/agCount, if agCount=0, no -gee
+//        // calculate total drivePower. find every GNDrive/GNDriveTau/GNCondenserDrive/GNThruster -> sum <drives>.drivePower.
+//        // thrusterCount is used to average force when apply to parts.
+//        foreach (Part p in Vessel.parts)
+//        {
+//            foreach (PartModule m in p.Modules)
+//            {
+//                if (m is GNDriveUnit drive)
+//                {
+//                    if (drive.engineOn) { totalDrivePower += drive.drivePower; thrusterCount++; }
+//                    if (drive.antiGravityOn) agCount++;
+//                }
+//                else if (m is GNDriveTauUnit drivetau)
+//                {
+//                    if (drivetau.engineOn) { totalDrivePower += drivetau.drivePower; thrusterCount++; }
+//                    if (drivetau.antiGravityOn) agCount++;
+//                }
+//                else if (m is GNCondenserDriveUnit condenser)
+//                {
+//                    if (condenser.engineOn) { totalDrivePower += condenser.drivePower; thrusterCount++; }
+//                    if (condenser.antiGravityOn) agCount++;
+//                }
+//                else if (m is GNThrusterUnit thruster)
+//                {
+//                    if (thruster.engineOn) { totalDrivePower += thruster.drivePower; thrusterCount++; }
+//                }
+//            }
+//            Debug.Log("[GN] Total Drive Power: " + totalDrivePower.ToString("F3") + " m/s * kg/s, Thruster Count: " + thrusterCount + ", AG Count: " + agCount);
+//        }
+
+//        // if thrusterCount=0 and agCount=0, return.
+//        if (thrusterCount == 0 && agCount == 0) return;
+
+//        // calculate total mass of vessel -> vessel.GetTotalMass()
+//        // calculate acceleration = totalDrivePower(m/s * kg/s)/totalMass(kg) -> m/s^2
+//        double totalMassKg = Vessel.GetTotalMass() * 1000.0;
+//        acceleration = (float)(totalMassKg > 0.0 ? (totalDrivePower * 1000 / totalMassKg) : 0f);
+//        if (ps.maxG > 0f && acceleration > ps.maxG) acceleration = ps.maxG;
+
+//        // calculate forcedirection = up*(throttle-Z)+forward*(-Y)+right*(-X)
+//        forceDirection = Vessel.ReferenceTransform.up * (Vessel.ctrlState.mainThrottle - Vessel.ctrlState.Z) + Vessel.ReferenceTransform.forward * (-Vessel.ctrlState.Y) + Vessel.ReferenceTransform.right * (-Vessel.ctrlState.X);
+//        if (forceDirection.sqrMagnitude > 1e-6f) forceDirection.Normalize();
+
+//        // calculate particle consumption = vessel.GetTotalMass() * acceleration * fuelEfficiency
+//        double particleDrainPerSec = (totalMassKg * acceleration * ps.fuelEfficiency * 0.001); // 単位は好きに定義
+//        double stepDemand = particleDrainPerSec * TimeWarp.fixedDeltaTime;
+//        if (stepDemand > 0)
+//        {
+//            // Vessel全体から消費（ID指定）
+//            //double taken = Vessel.RequestResource(ps.part, resDef.id, stepDemand, true);
+//            //if (taken < stepDemand * 0.1) // 足りないなら停止など
+//            //{
+//            //    ps.flags &= ~GNFlags.Ignited;
+//            //    return;
+//            //}
+//        }
+//        //particleDrain = Vessel.GetTotalMass() * acceleration * ps.fuelEfficiency;
+//        //Vessel.RequestResource(ps.part, resDef.id, particleDrain * TimeWarp.fixedDeltaTime, true);
+
+//        // apply acceleration to every part in vessel -> part.AddForce((acceleration/thrusterCount)*part.rb.mass*forceDirection)
+//        if (thrusterCount > 0 && forceDirection.sqrMagnitude > 0)
+//        {
+//            foreach (Part part in Vessel.parts)
+//            {
+//                if (part.physicalSignificance == Part.PhysicalSignificance.FULL && part.rb != null)
+//                {
+//                    // F = m * a / 台数
+//                    Vector3 force = (acceleration / thrusterCount) * part.rb.mass * forceDirection;
+//                    part.AddForce(force);
+//                    Debug.Log("[GN] Apply Force: " + force.ToString("F3") + " to Part: " + part.partInfo.title);
+//                }
+//            }
+//        }
+
+//        if (((ps.flags & GNFlags.AntiGravity) != 0) && agCount > 0)
+//        {
+//            Vector3 gee = FlightGlobals.getGeeForceAtPosition(Vessel.transform.position); // N/kg（≒ m/s^2） * kg でNに
+//            foreach (Part part in Vessel.parts)
+//            {
+//                if (part.physicalSignificance == Part.PhysicalSignificance.FULL && part.rb != null)
+//                {
+//                    // AGドライブ数で割って相殺量を分配（thrusterCountでは割らない）
+//                    Vector3 anti = -(gee / agCount) * part.rb.mass;
+//                    part.AddForce(anti);
+//                    Debug.Log("[GN] Apply Force: " + anti.ToString("F3") + " to Part: " + part.partInfo.title);
+//                }
 //            }
 //        }
 //    }
