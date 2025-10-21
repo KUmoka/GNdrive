@@ -13,8 +13,8 @@ namespace GNTechnology
     public class GNBaseSystem : PartModule // Pure condenser, Effect control system implemented here.
     {
         // variables for visual, physics states.
-        protected GNVisualState vs = GNVisualState.Empty;
-        protected GNPhysicsState ps = GNPhysicsState.Empty;
+        public GNVisualState vs = GNVisualState.Empty;
+        public GNPhysicsState ps = GNPhysicsState.Empty;
 
         //Lists
         List<Transform> listT = new List<Transform>();
@@ -44,10 +44,19 @@ namespace GNTechnology
         public bool taOn = false;
         [KSPField(guiActive = false, guiActiveEditor = false, guiName = "Max-G", isPersistant = true), UI_FloatRange(minValue = 0f, maxValue = 5f, stepIncrement = 0.1f)]
         public float accel = 1f;
+        [KSPField(guiActive = false, guiActiveEditor = false, guiName = "Input Electric Charge", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
+        public bool ECOn = false;
 
         // KSP field for indicate states
         [KSPField(guiName = "Engine Status", guiActive = false)]
         public string ES = "Deactivated";
+
+        // KSP field for Particle/EC Generation rate (Condenser = 0)
+        [KSPField(guiName = "Particle Generation", guiActive = false)]
+        public float ParticleGeneration = 0f;
+
+        [KSPField(guiName = "ElectricCharge Generation", guiActive = false)]
+        public double ECGeneration = 0f;
 
         public override void OnAwake()
         {
@@ -79,12 +88,6 @@ namespace GNTechnology
             base.OnFixedUpdate();
             Debug.Log("[GN] GN_Base_System OnFixedUpdate called.");
             PhysicsUpdate();
-        }
-
-        public void FixedUpdate()
-        {
-            // Required to enable physics update in PartModule
-            //PhysicsUpdate();
         }
 
         private void VisualInit()
@@ -140,7 +143,9 @@ namespace GNTechnology
             ps.TaOn = taOn;
             ps.HvOn = hvOn;
             ps.MaxG = accel;
-            GNPhysics.UpdatePhysics(ps);
+            ps.ParticleGenRate = ParticleGeneration;
+            ps.ECOn = ECOn;
+            GNPhysics.UpdatePhysics(ref ps);
         }
 
         private void StatusUpdate()
@@ -271,6 +276,7 @@ namespace GNTechnology
         {
             if (HighLogic.LoadedSceneIsEditor)
             {
+                // Basic PAW
                 Fields["engineOn"].guiActive = false;
                 Fields["agOn"].guiActive = false;
                 Fields["hvOn"].guiActive = false;
@@ -282,6 +288,10 @@ namespace GNTechnology
                 Fields["taOn"].guiActiveEditor = false;
                 Fields["accel"].guiActiveEditor = false;
                 Fields["ES"].guiActive = false;
+
+                // For Tau drive,
+                Fields["ECOn"].guiActive = false;
+                Fields["ECOn"].guiActiveEditor = false;
             }
         }
 
@@ -387,6 +397,7 @@ namespace GNTechnology
             if (HighLogic.LoadedSceneIsFlight)
             {
                 PAWActivate("engineOn", "agOn", "hvOn", "accel");
+                PAWActivate("ECOn");
             }
             else
             {
@@ -421,7 +432,7 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("engineOn", "agOn", "hvOn","taOn", "accel");
+                PAWActivate("agOn", "hvOn","taOn", "accel"); // Always on Engine, Cannot turn off.
             }
             else
             {
@@ -434,6 +445,10 @@ namespace GNTechnology
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
             Debug.Log($"[GN] vs.Mode={vs.Mode}");
+
+            part.force_activate(); // Keep part activated. 
+            engineOn = true; // GN Drive is always on.
+            ECOn = true; // GN Drive generates EC through EC consumption calculation method.
         }
 
         public override void OnUpdate()
@@ -442,13 +457,19 @@ namespace GNTechnology
             ParticleColorSwitcher();
         }
 
+        public override void OnFixedUpdate()
+        {
+            base.OnFixedUpdate();
+            part.force_activate(); // Keep part activated. 
+            engineOn = true; // GN Drive is always on.
+            ECOn = true;
+        }
+
         private void ParticleColorSwitcher()
         {
             if (taOn)
             {
                 vs.ParticleColor = new Color(1F, 0F, 100F / 255F, 1F);// For Trans-AM drive color
-                ps.ParticlePower = particlepower * 3f; // Increase particle power in TA mode
-                ps.MaxG = accel * 3f; // Increase MaxG in TA mode
             }
             else if (ps.UnSync)
             {

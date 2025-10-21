@@ -2,6 +2,7 @@
 using KSP;
 using System;
 using System.Linq;
+using System.Security.Principal;
 using UnityEngine;
 using UnityEngine.Scripting;
 
@@ -15,7 +16,9 @@ namespace GNTechnology
         public bool HvOn;
         public bool TaOn;
         public bool UnSync;
+        public bool ECOn;
         public float ParticlePower;
+        public float ParticleGenRate;
         public float MaxG;
 
         public static GNPhysicsState Empty => new GNPhysicsState
@@ -25,7 +28,9 @@ namespace GNTechnology
             HvOn = false,
             TaOn = false,
             UnSync = false,
+            ECOn = false,
             ParticlePower = 0f,
+            ParticleGenRate = 0f,
             MaxG = 0f
         };
     }
@@ -37,1191 +42,187 @@ namespace GNTechnology
             if (ps.part == null) return;
         }
 
-        public static void UpdatePhysics(in GNPhysicsState ps)
+        [Obsolete]
+        public static void UpdatePhysics(ref GNPhysicsState ps)
         {
-            Vessel Vessel = ps.part.vessel;
-            float throttle = Vessel.ctrlState.mainThrottle;
-            float y = -Vessel.ctrlState.Y;
-            float x = -Vessel.ctrlState.X;
-            float z = -Vessel.ctrlState.Z;
-            float actualG = ps.MaxG * 9.8f;//convert to m/s^2
-            float norm = Mathf.Sqrt(x * x + y * y + (z + throttle) * (z + throttle));
-            int driveCount = 0;
-
-            if (norm < 1e-6f) norm = 1f; // avoid division by zero
-
-            //Vectors
-            Vector3 ThrustDirection = Vessel.ReferenceTransform.up * (z + throttle) / norm + Vessel.ReferenceTransform.forward * y / norm + Vessel.ReferenceTransform.right * x / norm;
-            Vector3 gee = FlightGlobals.getGeeForceAtPosition(Vessel.transform.position);
-
-
-            Debug.Log("[GN] norm: " + norm);
-
+            // --- Basic NRE prevention ---
             if (ps.part == null) return;
-            if (!HighLogic.LoadedSceneIsFlight || !Vessel.isActiveVessel) return; // 流用
+            var vessel = ps.part.vessel;
+            if (vessel == null) return;
+            if (!HighLogic.LoadedSceneIsFlight || !vessel.isActiveVessel) return;
+            if (vessel.ReferenceTransform == null) return; // prevents NRE when switching vessels
 
-            // Drive count
-            foreach (Part p in Vessel.parts)
+            // input state 
+            var cs = vessel.ctrlState;
+            if (cs == null) return; //no control state, do nothing
+            float throttle = cs.mainThrottle;
+            float y = -cs.Y;
+            float x = -cs.X;
+            float z = -cs.Z;
+            float actualG = ps.MaxG * 9.8f; // m/s^2
+            float TotalParticlePower = 0f;
+            float limitFactor = 1f;
+            float accelMag = 0f;
+            int driveCount = 0, agCount = 0, hvCount = 0, taCount = 0;
+            double ECReqGen = 0f;
+
+            // Normalize input vector
+            float norm = Mathf.Sqrt(x * x + y * y + z * z);
+            float w = 0f;
+            if (norm >= 1e-6f)
             {
-                // drive count logic here
+                w = (1f - throttle) / norm;
+                w = Mathf.Clamp01(w);
             }
 
-                // Force application
-            foreach (Part p in Vessel.parts)
-            {
+            // Vector
+            var up = vessel.ReferenceTransform.up;
+            var fwd = vessel.ReferenceTransform.forward;
+            var rgt = vessel.ReferenceTransform.right;
+            Vector3 ThrustDirection = up * z * w + fwd * y * w + rgt * x * w + up * throttle;
+            Vector3 gee = FlightGlobals.getGeeForceAtPosition(vessel.transform.position); // m/s^2
 
-                if ((p.physicalSignificance == Part.PhysicalSignificance.FULL) && (p.rb != null))
+            // Hover acceleration calculation
+            Vector3d gAcc = gee;
+            float gLocal = (float)gAcc.magnitude;
+            Vector3 upHv = -(Vector3)gAcc.normalized;   // 上向き（AddForceに掛ける方向）            
+            float vVert = (float)vessel.verticalSpeed;// 縦速度（KSPなら vessel.verticalSpeed が地表基準の鉛直速度）
+            float aMax = Mathf.Max(0f, ps.MaxG * 9.80665f);// ユーザー設定上限（例：MaxG[G] → [m/s^2]へ換算）ps.MaxG が 1=1G といった意味なら：
+            float aHover = ps.HvOn ? ComputeHoverAccel(vVert, gLocal, Time.fixedDeltaTime, aMax) : 0f;// ホバー用の上向き必要加速度を1回だけ計算
+
+            // Drive, particle power count
+            foreach (Part p1 in vessel.parts)
+            {
+                foreach (PartModule m in p1.Modules)
                 {
-                    p.AddForce(ThrustDirection * actualG * p.rb.mass);
-                    if (ps.AgOn) p.AddForce(-gee * p.rb.mass);
+                    if (m is GNCondenserDriveSystem c && c.ps.EngineState)
+                    {
+                        driveCount++;
+                        if (c.ps.AgOn) agCount++;
+                        if (c.ps.HvOn) hvCount++;
+                        if (c.ps.TaOn) taCount++;
+                        TotalParticlePower += c.ps.ParticlePower;
+                    }
+                    else if (m is GNDriveTauSystem t && t.ps.EngineState)
+                    {
+                        driveCount++;
+                        if (t.ps.AgOn) agCount++;
+                        if (t.ps.HvOn) hvCount++;
+                        if (t.ps.TaOn) taCount++;
+                        TotalParticlePower += t.ps.ParticlePower;
+                    }
+                    else if (m is GNDriveSystem d && d.ps.EngineState)
+                    {
+                        driveCount++;
+                        if (d.ps.AgOn) agCount++;
+                        if (d.ps.HvOn) hvCount++;
+                        if (d.ps.TaOn) taCount++;
+                        TotalParticlePower += d.ps.ParticlePower;
+                    }
                 }
-
             }
 
+            // TA mode adjustments
+            if (ps.TaOn)
+            {
+                actualG *= 3f; // Increase actualG in TA mode
+                TotalParticlePower = TotalParticlePower + 2f * ps.ParticlePower; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
+            }
+
+            // Particle Generation furnace.
+            {
+                // EC required for generation
+                var TD = ps.part.Resources["TopologicalDefects"];
+                if (ps.ECOn)
+                {
+                    ECReqGen = ps.ParticleGenRate * (TD.maxAmount - 2 * TD.amount) * 0.1; // EC required proportional to lack of TD
+                    ps.part.RequestResource("ElectricCharge", ECReqGen * TimeWarp.fixedDeltaTime);
+                    ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime));
+                }
+            }
+
+            // Resource drain calculation
+            double mass = vessel.GetTotalMass(); // KSP1.12はdouble
+            if (ps.AgOn)
+                accelMag = gee.magnitude + ThrustDirection.magnitude * actualG;  // m/s^2
+            else
+                accelMag = ThrustDirection.magnitude * actualG;                   // m/s^2
+
+            // consumption calculation
+            double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime;
+            Debug.Log("[GN] Particle consumption calculated: " + consumption.ToString("F4"));
+            ps.part.RequestResource("GNparticle", consumption);
+
+            // limit factor calculation
+            if (consumption > 0 && consumption > TotalParticlePower)
+                limitFactor = (float)(TotalParticlePower / consumption); // 0..1想定
+            if (ps.UnSync)
+                limitFactor = 0.001f; // UnSync mode -> power almost off.Later think this to a better implementation.
+            if (ps.part.Resources["GNparticle"].amount < 1)
+            {
+                limitFactor = 0f; // No Particle -> power off
+                ps.EngineState = false; // also turn off engine state,
+                ps.TaOn = false; // TRANS-AM off
+                ps.AgOn = false; // AG off
+                ps.HvOn = false; // hover off
+            }
+
+            // --- Force application ---
+            foreach (Part p2 in vessel.parts)
+            {
+                if (p2.physicalSignificance != Part.PhysicalSignificance.FULL || p2.rb == null)
+                    continue;
+
+                // Main thrust
+                p2.AddForce(ThrustDirection * actualG * limitFactor * p2.rb.mass);
+
+                // Anti-gravity, divided by drive count
+                if (ps.AgOn && agCount > 0)
+                    p2.AddForce(-gee * p2.rb.mass * limitFactor / agCount);
+
+                // Hover処理はここに（必要なら）
+                if (ps.HvOn && aHover > 0f)
+                {
+                    // ここで limitFactor を掛けるなら、ホバーの効きもUIで同率に制限できます
+                    float forceN = aHover * p2.rb.mass * limitFactor;  // [N] = [m/s^2] * [kg]
+                    p2.AddForce(upHv * forceN / hvCount);
+                    double consumptionHv = p2.rb.mass * aHover / hvCount * TimeWarp.fixedDeltaTime;
+                    ps.part.RequestResource("GNparticle", consumptionHv);
+                }
+            }
         }
-        
+
+        static float _hoverLastA = 0f;      // 前回の上向き加速度 [m/s^2]（スルーレート用）
+        const float HoverVHard = 1.0f;      // 強ブレーキ域しきい値 |v|>=これで全力減速
+        const float HoverEps = 0.001f;    // デッドバンド（これ以下なら0扱い）
+        const float HoverSlewA = 30f;
+
+        private static float ComputeHoverAccel(float v, float gLocal, float dt, float aMax)
+        {
+
+
+            float a_cmd;
+            float av = Mathf.Abs(v);
+
+            if (av >= HoverVHard)
+                a_cmd = -Mathf.Sign(v) * aMax;                       // 強ブレーキ
+            else if (av > HoverEps)
+                a_cmd = Mathf.Clamp(-v / (2f * dt), -aMax, aMax);    // 半減則（次フレで速度を半分に）
+            else
+                a_cmd = 0f;
+
+            // 重力補償を足して、上向きの必要加速度に
+            float a_total = a_cmd + gLocal;
+
+            // 物理的に「下向き推力」は出せないので 0 未満は切る
+            if (a_total < 0f) a_total = 0f;
+
+            // 推力スパイク回避のためスルーレートで平滑化
+            float maxStep = HoverSlewA * dt;
+            a_total = Mathf.MoveTowards(_hoverLastA, a_total, maxStep);
+            _hoverLastA = a_total;
+
+            return a_total;
+        }
     }
 }
-
-//cache visual parts will be added here.
-//handy method for get rotor transforms.
-//Debug.Log("[GN] GNCondenserUnit OnStart Run");
-//var all = part.transform.GetComponentsInChildren<Transform>(true);
-//foreach (var t in all)
-//{
-//    if (t.name.Contains("rotor")) Debug.Log("[GN] T:" + t.name);
-//}
-
-//public class ParticleEmissionControl : PartModule
-//{
-//    // Adjustable parameters.
-//    [KSPField(guiActiveEditor = true, guiName = "Min Emission", isPersistant = true)]
-//    public float minimumEmission = 7000f;
-
-//    [KSPField(guiActiveEditor = true, guiName = "Max Emission", isPersistant = true)]
-//    public float maximumEmission = 9000f;
-
-//    [KSPField(guiActiveEditor = true, guiName = "Bias", isPersistant = true)]
-//    public float bias = 0.01f; //Base emission rate when no input.
-
-//    [KSPField(guiActiveEditor = true, guiName = "Throttle Weight", isPersistant = true)]
-//    public float throttleWeight = 1.0f;
-
-//    [KSPField(guiActiveEditor = true, guiName = "RCS Weight", isPersistant = true)]
-//    public float rcsWeight = 1.0f;
-
-//    [KSPField(guiActiveEditor = true, guiName = "Smoothing (1/s)", isPersistant = true)]
-//    public float smoothRate = 8f; //Larger value means faster response, For future use.
-
-//    //Treansform reference.
-//    private KSPParticleEmitter emitter;
-//    private float currentMin, currentMax; //For future use, for smoothing.
-
-//    //private floats
-//    private float fr = 600f;
-
-//    public override void OnStart(StartState state)
-//    {
-//        base.OnStart(state);
-
-//        // get emitter reference, assume the transform name is "EMI".
-//        var tf = part.FindModelTransform("EMI");
-//        if (tf != null)
-//        {
-//            emitter = tf.GetComponent<KSPParticleEmitter>();
-//            if (emitter == null)
-//                emitter = tf.GetComponentInChildren<KSPParticleEmitter>(true);
-//        }
-//        if (emitter == null)
-//        {
-//            Debug.LogWarning("[GN] ParticleEmissionControl: Emitter not found (EMI).");
-//            enabled = false; //When error, disable this module.
-//            return;
-//        }
-
-//        currentMin = emitter.minEmission;
-//        currentMax = emitter.maxEmission;
-//    }
-
-//    public override void OnUpdate()
-//    {
-//        // For visual, OnUpdate is enough.
-//        if (!HighLogic.LoadedSceneIsFlight || vessel == null || emitter == null) return;
-
-//        // get input state(sometimes, ctrlState is null).
-//        var cs = vessel.ctrlState;
-//        float throttle = 0f, rcsMag = 0f;
-//        if (cs != null)
-//        {
-//            throttle = Mathf.Clamp01(cs.mainThrottle);
-
-//            // RCS vector magnitude
-//            // RCS input is in the range of -1..1 for each axis, so.
-//            // （if needs, pitch/yaw/roll should be added）
-//            Vector3 rcsVec = new Vector3(cs.X, cs.Y, cs.Z);
-//            rcsMag = Mathf.Clamp01(rcsVec.magnitude);
-//        }
-
-//        // get current emitter rate.
-//        currentMin = emitter.minEmission;
-//        currentMax = emitter.maxEmission;
-
-//        // weight and bias for clamp inputs.
-//        float drive01 = Mathf.Clamp01(throttle * throttleWeight + rcsMag * rcsWeight + bias);
-
-//        // target emission rate.
-//        float targetMin = minimumEmission * drive01;
-//        float targetMax = maximumEmission * drive01;
-
-//        // apply directly for now.
-//        emitter.minEmission = emitter.minEmission + Mathf.RoundToInt(smoothRate * (targetMin - currentMin) / fr);
-//        emitter.maxEmission = emitter.maxEmission + Mathf.RoundToInt(smoothRate * (targetMax - currentMax) / fr);
-//    }
-//}
-
-//namespace NoUsing
-//{
-//    public static void Update(ref GNPhysicalState ps)
-//    {
-//        if (!ps.initialized || ps.part == null) return;
-//        var vessel = ps.vessel ?? ps.part.vessel;
-//        if (vessel == null || !HighLogic.LoadedSceneIsFlight || !vessel.isActiveVessel) return;
-
-//        // --- 入力の取り出し
-//        var cs = vessel.ctrlState;
-//        float x = -cs.X * ps.overload * 10f;
-//        float y = -cs.Y * ps.overload * 10f;
-//        float z = (cs.mainThrottle - cs.Z) * ps.overload * 10f;
-
-//        // --- 重力ベクトル（1基あたり割り）
-//        int agCount = CountEnginesWithFlag(vessel, GNFlags.AntiGravity);
-//        Vector3 gee = FlightGlobals.getGeeForceAtPosition(vessel.transform.position);
-//        if (agCount > 0) gee /= agCount;
-
-//        // --- 基本制御力
-//        Vector3 control =
-//            vessel.ReferenceTransform.up * z +
-//            vessel.ReferenceTransform.forward * y +
-//            vessel.ReferenceTransform.right * x;
-
-//        // --- Hover（垂直速度打消し）
-//        if (Has(ps.flags, GNFlags.AntiGravity) && Has(ps.flags, GNFlags.Hover))
-//        {
-//            float vVert = Vector3.Dot(gee.normalized, ps.part.rb.velocity);
-//            ps.hoverPid.Calibrateclamp(ps.overload);
-//            Vector3 cancel = ps.hoverPid.Control(vVert) * gee.normalized * 10f / Mathf.Max(1, agCount);
-//            control -= cancel;
-//        }
-
-//        // --- Trans-AMブースト
-//        float teFactor = 1f;
-//        if (Has(ps.flags, GNFlags.TransAM))
-//        {
-//            control *= 5f;
-//            teFactor = Mathf.Max(1f, Mathf.Pow(ps.particleRate, Mathf.Max(0, CountIgnited(vessel) - 1)));
-//        }
-
-//        // --- 同期制限（必要ならカット）
-//        int ignitedCount = CountIgnited(vessel);
-//        if (ps.maxSyncEngines > 0 && ignitedCount > ps.maxSyncEngines)
-//        {
-//            control = Vector3.zero;
-//            gee = Vector3.zero;
-//            teFactor = 0.001f;
-//        }
-
-//        // --- フラグで出力制御
-//        if (!Has(ps.flags, GNFlags.Ignited)) control = Vector3.zero;
-//        if (!Has(ps.flags, GNFlags.AntiGravity)) gee = Vector3.zero;
-
-//        // --- リソース計算（GN 消費と生成）
-//        float mass = vessel.GetTotalMass();
-//        float accelMag = (-gee + control).magnitude;
-
-//        // 消費 [units/s] ≒ m * |a| * η
-//        float consumption = mass * Mathf.Abs(accelMag) * ps.fuelEfficiency;
-
-//        // 生成／変換（TransAM時は最低生成量を粒子レート×teFactorまで引き上げる例）
-//        float particleGen = Has(ps.flags, GNFlags.TransAM) ? ps.particleRate * teFactor : 0f;
-
-//        // 実リクエスト（Δt倍）
-//        double delta = TimeWarp.fixedDeltaTime;
-//        double requested = (consumption - particleGen) * delta;
-
-//        // GNparticle残量反映
-//        double drawn = ps.part.RequestResource("GNparticle", requested);
-
-//        // 枯渇時は停止
-//        if (requested > 0 && Math.Round(drawn, 5) < Math.Round(requested, 5))
-//        {
-//            Set(ref ps, GNFlags.Ignited, false);
-//            Set(ref ps, GNFlags.AntiGravity, false);
-//            Set(ref ps, GNFlags.TransAM, false);
-//            control = Vector3.zero;
-//            gee = Vector3.zero;
-//        }
-
-//        // --- 力を各Partに加える（KSPのAddForceはパーツ質量でスケール）
-//        if (Has(ps.flags, GNFlags.Ignited))
-//        {
-//            foreach (var p in vessel.parts)
-//                if (p.physicalSignificance == Part.PhysicalSignificance.FULL && p.rb != null)
-//                    p.AddForce(control * p.rb.mass);
-//        }
-//        if (Has(ps.flags, GNFlags.AntiGravity))
-//        {
-//            foreach (var p in vessel.parts)
-//                if (p.physicalSignificance == Part.PhysicalSignificance.FULL && p.rb != null)
-//                    p.AddForce(-gee * p.rb.mass);
-//        }
-
-//        // --- 慣性制御（簡易版のフック。必要ならここを拡張）
-//        if (Has(ps.flags, GNFlags.InertiaControl))
-//        {
-//            // 例：将来ここでターゲット追従力をcontrolに加算する
-//            // ps.part.vessel.targetObject ... を参照して拡張
-//        }
-
-//        // --- スモークテスト：常に上向きに +5 m/s^2 をかける
-//        foreach (var p in ps.vessel.parts)
-//        {
-//            if (p.physicalSignificance == Part.PhysicalSignificance.FULL && p.rb != null)
-//            {
-//                // 質量を無視して加速度指定（ForceMode.Acceleration）
-//                p.rb.AddForce(Vector3.up * 5f, ForceMode.Acceleration);
-//            }
-//        }
-//    }
-//    public class ProtoTaudrive : PartModule
-//    {
-//        [KSPField]
-//        public float fuelefficiency = 1F;
-//        [KSPField]
-//        public float particlegrate = 800F;
-//        [KSPField]
-//        public float ConvertRatio = 1F;
-//        public Vector4 color = Vector4.zero;
-
-
-//        [KSPField(isPersistant = true)]
-//        public bool engineIgnited = false;
-//        public bool flameOut = false;
-//        public bool agActivated = false;
-//        public bool depleted = false;
-//        public bool ecActivated = false;
-
-//        [KSPField(guiName = "Engine Status", guiActive = true)]
-//        private string ES = "Deactivated";
-
-//        [KSPField(guiName = "Mass", guiActive = true)]
-//        private string mass = "N/a";
-
-//        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "Max Overload", isPersistant = true), UI_FloatRange(minValue = 0f, maxValue = 5f, stepIncrement = 0.1f)]
-//        public float Overload = 1f;
-
-//        [KSPAction("Toggle", KSPActionGroup.None, guiName = "Toggle Engine")]
-//        private void ActionActivate(KSPActionParam param)
-//        {
-//            if (engineIgnited == true)
-//            {
-//                Deactivate();
-//            }
-//            else
-//            {
-//                Activate();
-//            }
-//        }
-
-//        [KSPEvent(name = "Activate", guiName = "Activate Engine", active = true, guiActive = true)]
-//        public void Activate()
-//        {
-//            if (depleted == false)
-//            {
-//                engineIgnited = true;
-//                Events["Deactivate"].guiActive = true;
-//                Events["Activate"].guiActive = false;
-//            }
-//        }
-
-//        [KSPEvent(name = "Deactivate", guiName = "Deactivate Engine", active = true, guiActive = false)]
-//        public void Deactivate()
-//        {
-//            engineIgnited = false;
-//            Events["Deactivate"].guiActive = false;
-//            Events["Activate"].guiActive = true;
-//        }
-
-//        [KSPAction("Toggleag", KSPActionGroup.None, guiName = "Toggle Antigravity")]
-//        private void Toggleag(KSPActionParam param)
-//        {
-//            if (agActivated == true)
-//            {
-//                Deactivateag();
-//            }
-//            else
-//            {
-//                Activateag();
-//            }
-
-//        }
-
-//        [KSPEvent(name = "Activateag", guiName = "Activate Antigravity", active = true, guiActive = true)]
-//        public void Activateag()
-//        {
-//            if (depleted == false)
-//            {
-//                agActivated = true;
-//                engineIgnited = true;
-//                Events["Deactivateag"].guiActive = true;
-//                Events["Activateag"].guiActive = false;
-//            }
-
-//        }
-
-//        [KSPEvent(name = "Deactivateag", guiName = "Deactivate Antigravity", active = true, guiActive = false)]
-//        public void Deactivateag()
-//        {
-//            agActivated = false;
-//            Events["Deactivateag"].guiActive = false;
-//            Events["Activateag"].guiActive = true;
-//        }
-
-//        [KSPEvent(name = "Activateec", guiName = "Activate Converter", active = true, guiActive = true)]
-//        public void Activateec()
-//        {
-//            ecActivated = true;
-//            Events["Deactivateec"].guiActive = true;
-//            Events["Activateec"].guiActive = false;
-//        }
-
-//        [KSPEvent(name = "Deactivateec", guiName = "Deactivate Converter", active = true, guiActive = false)]
-//        public void Deactivateec()
-//        {
-//            ecActivated = false;
-//            Events["Deactivateec"].guiActive = false;
-//            Events["Activateec"].guiActive = true;
-//        }
-
-//        protected Transform rotorTransform = null;
-
-//        public override void OnStart(PartModule.StartState state)
-//        {
-//            Debug.Log("[GN] OnStart Run");
-
-//            part.stagingIcon = "LIQUID_ENGINE";
-//            base.OnStart(state);
-//            {
-//                if (state != StartState.Editor && state != StartState.None)
-//                {
-//                    this.enabled = true;
-//                    this.part.force_activate();
-//                }
-//                else
-//                {
-//                    this.enabled = false;
-//                }
-//            }
-//        }
-
-//        public void Update()
-//        {
-//            if (HighLogic.LoadedSceneIsEditor)
-//            {
-//                return;
-//            }
-
-//        }
-
-//        public override void OnUpdate()
-//        {
-//            base.OnUpdate();
-//        }
-
-//        public override void OnFixedUpdate()
-//        {
-//            ES = "Deactivated";
-//            if (depleted == true && part.Resources["GNparticle"].amount == part.Resources["GNparticle"].maxAmount)
-//            {
-//                depleted = false;
-//            }
-//            if (!HighLogic.LoadedSceneIsFlight || !vessel.isActiveVessel) return;
-//            float pitch = vessel.ctrlState.pitch;
-//            float roll = vessel.ctrlState.roll;
-//            float yaw = vessel.ctrlState.yaw;
-//            float throttle = vessel.ctrlState.mainThrottle * Overload;
-//            float y = -vessel.ctrlState.Y * Overload * 10;
-//            float x = -vessel.ctrlState.X * Overload * 10;
-//            float z = throttle * 10 - vessel.ctrlState.Z * Overload * 10;
-//            float enginecount = 0;
-//            float tefactor = 1;
-//            float ID = GetInstanceID();
-
-//            if (agActivated == true)
-//            {
-//                engineIgnited = true;
-//            }
-
-//            foreach (Part p in this.vessel.Parts)
-//            {
-//                foreach (PartModule m in p.Modules)
-//                {
-//                    ProtoTaudrive drive = null;
-//                    ProtoGNdrive gdrive = null;
-//                    if (m.moduleName == "ProtoTaudrive")
-//                    {
-//                        drive = (ProtoTaudrive)m;
-//                        if (drive.agActivated == true)
-//                        {
-//                            enginecount += 1;
-//                        }
-//                    }
-//                    else
-//                        if (m.moduleName == "ProtoGNdrive")
-//                    {
-//                        gdrive = (ProtoGNdrive)m;
-//                        if (gdrive.agActivated == true)
-//                        {
-//                            enginecount += 1;
-//                        }
-//                    }
-//                }
-//            }
-
-//            if (engineIgnited == true)
-//            {
-//                ES = "Activated";
-//                Events["Deactivate"].guiActive = true;
-//                Events["Activate"].guiActive = false;
-//            }
-//            else
-//            {
-//                Events["Deactivate"].guiActive = false;
-//                Events["Activate"].guiActive = true;
-//            }
-
-//            if (agActivated == true)
-//            {
-//                ES = "Activated";
-//                Events["Deactivateag"].guiActive = true;
-//                Events["Activateag"].guiActive = false;
-//            }
-//            else
-//            {
-//                Events["Deactivateag"].guiActive = false;
-//                Events["Activateag"].guiActive = true;
-//            }
-
-//            if (depleted == true)
-//            {
-//                ES = "GNparticle depleted";
-//                Deactivate();
-//                Deactivateag();
-//            }
-
-//            Vector3 srfVelocity = vessel.GetSrfVelocity();
-//            float VerticalV;
-//            VerticalV = (float)vessel.verticalSpeed;
-//            Vector3 Airspeed = vessel.transform.InverseTransformDirection(srfVelocity);
-//            Vector3 gee = FlightGlobals.getGeeForceAtPosition(this.vessel.transform.position) / enginecount;
-//            Vector3 controlforce = vessel.ReferenceTransform.up * z + vessel.ReferenceTransform.forward * y + vessel.ReferenceTransform.right * x;
-
-//            if (engineIgnited == false)
-//            {
-//                controlforce = Vector3.zero;
-//            }
-//            if (agActivated == false)
-//            {
-//                gee = Vector3.zero;
-//            }
-
-//            double consumption = vessel.GetTotalMass() * Mathf.Abs((-gee + controlforce).magnitude) * fuelefficiency * TimeWarp.fixedDeltaTime;
-//            if (ecActivated == true)
-//            {
-//                double elcconsume = particlegrate * ConvertRatio * TimeWarp.fixedDeltaTime;
-//                double elcDrawn = this.part.RequestResource("ElectricCharge", elcconsume);
-//                double ratio = elcDrawn / elcconsume;
-//                double GNDrawn = this.part.RequestResource("GNparticle", -(elcconsume / ConvertRatio) * ratio);
-//                double backcharge = this.part.RequestResource("ElectricCharge", -GNDrawn * ConvertRatio - elcDrawn);
-//            }
-
-//            double GNconsumtion = this.part.RequestResource("GNparticle", consumption);
-
-//            if (consumption != 0 && Math.Round(GNconsumtion, 5) < Math.Round(consumption, 5))
-//            {
-//                depleted = true;
-//                controlforce = Vector3.zero;
-//                gee = Vector3.zero;
-//                agActivated = false;
-//                engineIgnited = false;
-//                Deactivate();
-//                Deactivateag();
-//                part.Resources["GNparticle"].amount = 0;
-
-//            }
-
-//            mass = vessel.GetTotalMass().ToString("R");
-
-//            if (engineIgnited == true)
-//            {
-//                foreach (Part p in this.vessel.parts)
-//                {
-//                    if ((p.physicalSignificance == Part.PhysicalSignificance.FULL) && (p.rb != null))
-//                    {
-//                        p.AddForce(controlforce * p.rb.mass);
-//                    }
-//                }
-//            }
-
-
-//            if (agActivated == true)
-//            {
-//                foreach (Part p in this.vessel.parts)
-//                {
-//                    if ((p.physicalSignificance == Part.PhysicalSignificance.FULL) && (p.rb != null))
-//                    {
-//                        p.AddForce(-gee * p.rb.mass);
-//                    }
-//                }
-//            }
-//        }
-//    }
-//    public class ProtoGNdrive : PartModule
-//    {
-//        [KSPField]
-//        public float fuelefficiency = 1F;
-//        [KSPField]
-//        public float particlegrate = 1000F;
-//        [KSPField]
-//        public float maxenginecount = 2F;
-
-//        public Vector4 color = Vector4.zero;
-
-//        [KSPField(isPersistant = true)]
-//        public bool engineIgnited = false;
-//        public bool flameOut = false;
-//        public bool agActivated = false;
-//        public bool hvActivated = false;
-//        public bool taactivated = false;
-//        public bool ICactivated = false;
-//        public bool ICIsActivaed = false;
-//        public bool modified = false;
-//        public float overloadtemp = 0;
-
-//        private PidController brakePid = new PidController(10F, 0.005F, 0.002F, 50, 5);
-
-//        [KSPField(guiName = "Engine Status", guiActive = true)]
-//        private string ES = "Deactivated";
-
-//        [KSPField(guiName = "Mass", guiActive = true)]
-//        private string mass = "N/a";
-
-//        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "Max Overload", isPersistant = true), UI_FloatRange(minValue = 0f, maxValue = 5f, stepIncrement = 0.1f)]
-//        public float Overload = 1f;
-
-//        [KSPAction("Toggle", KSPActionGroup.None, guiName = "Toggle Engine")]
-//        private void ActionActivate(KSPActionParam param)
-//        {
-//            if (engineIgnited == true)
-//            {
-//                Deactivate();
-//            }
-//            else
-//            {
-//                Activate();
-//            }
-//        }
-
-//        [KSPEvent(name = "Activate", guiName = "Activate Engine", active = true, guiActive = true)]
-//        public void Activate()
-//        {
-//            this.part.force_activate();
-//            engineIgnited = true;
-//            Events["Deactivate"].guiActive = true;
-//            Events["Activate"].guiActive = false;
-//            modified = true;
-
-//        }
-
-//        [KSPEvent(name = "Deactivate", guiName = "Deactivate Engine", active = true, guiActive = false)]
-//        public void Deactivate()
-//        {
-//            engineIgnited = false;
-//            Events["Deactivate"].guiActive = false;
-//            Events["Activate"].guiActive = true;
-//            modified = true;
-//        }
-
-//        [KSPEvent(name = "Activateta", guiName = "Trans-AM", active = true, guiActive = false)]
-//        public void Activateta()
-//        {
-//            taactivated = true;
-//            Events["Activateta"].guiActive = false;
-//            modified = true;
-//        }
-
-//        [KSPAction("Toggleag", KSPActionGroup.None, guiName = "Toggle Antigravity")]
-//        private void Toggleag(KSPActionParam param)
-//        {
-//            if (agActivated == true)
-//            {
-//                Deactivateag();
-//            }
-//            else
-//            {
-//                Activateag();
-//            }
-
-//        }
-
-//        [KSPEvent(name = "Activateag", guiName = "Activate Antigravity", active = true, guiActive = true)]
-//        public void Activateag()
-//        {
-//            this.part.force_activate();
-//            agActivated = true;
-//            Events["Deactivateag"].guiActive = true;
-//            Events["Activateag"].guiActive = false;
-//            Events["Activatehv"].guiActive = true;
-//            modified = true;
-//            Deactivatehv();
-//        }
-
-//        [KSPEvent(name = "Deactivateag", guiName = "Deactivate Antigravity", active = true, guiActive = false)]
-//        public void Deactivateag()
-//        {
-//            agActivated = false;
-//            hvActivated = false;
-//            Events["Deactivateag"].guiActive = false;
-//            Events["Activateag"].guiActive = true;
-//            Events["Activatehv"].guiActive = false;
-//            Events["Deactivatehv"].guiActive = false;
-//            modified = true;
-//        }
-
-//        [KSPAction("Toggle Hover", KSPActionGroup.None)]
-//        private void Togglehv(KSPActionParam param)
-//        {
-//            if (agActivated == true && !hvActivated)
-//            {
-//                Activatehv();
-//            }
-//            else
-//            {
-//                Deactivatehv();
-//            }
-
-//        }
-
-//        [KSPEvent(name = "Activatehv", guiName = "Activate Hover", active = true, guiActive = false)]
-//        public void Activatehv()
-//        {
-//            this.part.force_activate();
-//            hvActivated = true;
-//            Events["Deactivatehv"].guiActive = true;
-//            Events["Activatehv"].guiActive = false;
-//            modified = true;
-
-//        }
-
-//        [KSPEvent(name = "Deactivatehv", guiName = "Deactivate Hover", active = true, guiActive = false)]
-//        public void Deactivatehv()
-//        {
-//            hvActivated = false;
-//            Events["Deactivatehv"].guiActive = false;
-//            Events["Activatehv"].guiActive = true;
-//            modified = true;
-//        }
-//        [KSPAction("Toggle Inertia control", KSPActionGroup.None)]
-//        private void ICActionActivate(KSPActionParam param)
-//        {
-//            if (ICIsActivaed == true)
-//            {
-//                ICDeactivate();
-//            }
-//            else
-//            {
-//                ICActivate();
-//            }
-//        }
-
-//        [KSPEvent(name = "ICActivate", guiName = "Activate Inertia control", active = true, guiActive = true)]
-//        public void ICActivate()
-//        {
-//            this.part.force_activate();
-//            ICIsActivaed = true;
-//            Events["ICDeactivate"].guiActive = true;
-//            Events["ICActivate"].guiActive = false;
-//            modified = true;
-//        }
-
-//        [KSPEvent(name = "ICDeactivate", guiName = "Deactivate Inertia control", active = true, guiActive = false)]
-//        public void ICDeactivate()
-//        {
-//            ICIsActivaed = false;
-//            Events["ICDeactivate"].guiActive = false;
-//            Events["ICActivate"].guiActive = true;
-//            modified = true;
-//        }
-
-//        public override void OnStart(PartModule.StartState state)
-//        {
-//            part.stagingIcon = "LIQUID_ENGINE";
-//            if (state != StartState.Editor && state != StartState.None)
-//            {
-//                this.enabled = true;
-//                this.part.force_activate();
-//            }
-//            overloadtemp = Overload;
-//        }
-
-//        public void Update()
-//        {
-//            if (HighLogic.LoadedSceneIsEditor)
-//            {
-//                return;
-//            }
-//        }
-
-//        public override void OnFixedUpdate()
-//        {
-//            ES = "Deactivated";
-//            if (!HighLogic.LoadedSceneIsFlight || !vessel.isActiveVessel) return;
-//            float pitch = vessel.ctrlState.pitch;
-//            float roll = vessel.ctrlState.roll;
-//            float yaw = vessel.ctrlState.yaw;
-//            float throttle = vessel.ctrlState.mainThrottle * Overload;
-//            float y = -vessel.ctrlState.Y * Overload * 10;
-//            float x = -vessel.ctrlState.X * Overload * 10;
-//            float z = throttle * 10 - vessel.ctrlState.Z * Overload * 10;
-//            float enginecount = 1;
-//            float agenginecount = 0;
-//            float tefactor = 1;
-//            float ID = GetInstanceID();
-
-//            if (Overload != overloadtemp)
-//            {
-//                modified = true;
-//            }
-
-//            if (agActivated == true)
-//            {
-//                engineIgnited = true;
-//            }
-
-//            if (engineIgnited == true)
-//            {
-//                foreach (Part p in this.vessel.Parts)
-//                {
-//                    foreach (PartModule m in p.Modules)
-//                    {
-//                        ProtoGNdrive drive = null;
-//                        ProtoTaudrive tdrive = null;
-//                        if (m.moduleName == "ProtoGNdrive")
-//                        {
-//                            drive = (ProtoGNdrive)m;
-//                            if (drive.engineIgnited == true && drive.GetInstanceID() != GetInstanceID())
-//                            {
-//                                enginecount += 1;
-//                                if (modified == true)
-//                                {
-//                                    if (drive.modified == true)
-//                                    {
-//                                        taactivated = drive.taactivated;
-//                                        agActivated = drive.agActivated;
-//                                        Overload = drive.Overload;
-//                                        overloadtemp = drive.Overload;
-//                                        hvActivated = drive.hvActivated;
-//                                        ICactivated = drive.ICactivated;
-//                                        ICIsActivaed = drive.ICIsActivaed;
-
-//                                    }
-//                                    else
-//                                    {
-//                                        drive.taactivated = taactivated;
-//                                        drive.agActivated = agActivated;
-//                                        drive.Overload = Overload;
-//                                        drive.overloadtemp = Overload;
-//                                        drive.hvActivated = hvActivated;
-//                                        drive.ICactivated = ICactivated;
-//                                        drive.ICIsActivaed = ICIsActivaed;
-//                                    }
-//                                }
-//                            }
-//                            if (drive.agActivated == true)
-//                            {
-//                                agenginecount += 1;
-//                            }
-//                        }
-//                        else
-//                            if (m.moduleName == "Taudrive")
-//                        {
-//                            tdrive = (ProtoTaudrive)m;
-//                            if (tdrive.agActivated == true)
-//                            {
-//                                agenginecount += 1;
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-
-//            modified = false;
-
-//            if (engineIgnited == true)
-//            {
-//                ES = "Activated";
-//                Events["Deactivate"].guiActive = true;
-//                Events["Activate"].guiActive = false;
-//            }
-//            else
-//            {
-//                Events["Deactivate"].guiActive = false;
-//                Events["Activate"].guiActive = true;
-//            }
-
-
-//            if (hvActivated == true && agActivated == true)
-//            {
-//                Events["Deactivatehv"].guiActive = true;
-//                Events["Activatehv"].guiActive = false;
-//            }
-//            else
-//            {
-//                Events["Deactivatehv"].guiActive = false;
-//                Events["Activatehv"].guiActive = true;
-//            }
-
-//            if (agActivated == true)
-//            {
-//                ES = "Activated";
-//                Events["Deactivateag"].guiActive = true;
-//                Events["Activateag"].guiActive = false;
-//            }
-//            else
-//            {
-//                Events["Deactivateag"].guiActive = false;
-//                Events["Activateag"].guiActive = true;
-//                Events["Deactivatehv"].guiActive = false;
-//                Events["Activatehv"].guiActive = false;
-//                hvActivated = false;
-//                if (engineIgnited == false)
-//                {
-//                    taactivated = false;
-//                    Events["Activateta"].guiActive = true;
-//                }
-//            }
-
-//            if (taactivated == true)
-//            {
-//                ES = "Trans-AM";
-//            }
-
-//            Vector3 srfVelocity = vessel.GetSrfVelocity();
-//            float VerticalV;
-//            VerticalV = (float)vessel.verticalSpeed;
-//            //bool break = 
-//            Vector3 Airspeed = vessel.transform.InverseTransformDirection(srfVelocity);
-//            Vector3 gee = FlightGlobals.getGeeForceAtPosition(this.vessel.transform.position) / agenginecount;
-//            float Vvelocity = Vector3.Dot(gee.normalized, part.rb.velocity);
-//            brakePid.Calibrateclamp(Overload);
-//            Vector3 VvCancel = hvActivated ? brakePid.Control(Vvelocity) * gee.normalized * 10 / agenginecount : Vector3.zero;
-//            Vector3 controlforce = vessel.ReferenceTransform.up * z + vessel.ReferenceTransform.forward * y + vessel.ReferenceTransform.right * x - VvCancel;
-
-//            if (enginecount > maxenginecount)
-//            {
-//                ES = "Unsynchronized";
-//                controlforce = Vector3.zero;
-//                gee = Vector3.zero;
-//                tefactor = 0.001F;
-//            }
-//            else
-//            {
-//                tefactor = (float)Math.Pow((double)particlegrate, (double)enginecount - 1);
-//            }
-
-//            if (engineIgnited == false)
-//            {
-//                controlforce = Vector3.zero;
-//            }
-//            if (agActivated == false)
-//            {
-//                gee = Vector3.zero;
-//            }
-//            float consumption = vessel.GetTotalMass() * Mathf.Abs((-gee + controlforce).magnitude) * fuelefficiency;
-//            float particlegen = particlegrate * tefactor;
-
-//            if (taactivated == true)
-//            {
-
-//                controlforce *= 5;
-//                consumption = 4 * consumption - 3 * vessel.GetTotalMass() * Mathf.Abs(gee.magnitude) * fuelefficiency;
-//                Events["Activateta"].guiActive = false;
-//                consumption = Mathf.Max(particlegen, consumption) + 4;
-//            }
-//            else
-//            {
-//                if (engineIgnited == true)
-//                {
-//                    Events["Activateta"].guiActive = true;
-//                }
-
-//            }
-
-//            double reschange = (consumption - particlegen) * TimeWarp.fixedDeltaTime;
-//            double resourceDrawn = this.part.RequestResource("GNparticle", reschange);
-
-//            if (resourceDrawn == 0 && reschange > 0)
-//            {
-//                ES = "GNparticle depleted";
-//                controlforce = Vector3.zero;
-//                gee = Vector3.zero;
-//                Deactivate();
-//                Deactivateag();
-//                taactivated = false;
-//            }
-
-//            mass = vessel.GetTotalMass().ToString("R");
-
-//            if (engineIgnited == true)
-//            {
-//                if (this.vessel.ActionGroups.groups[3])
-//                {
-//                    if (controlforce.magnitude > Overload)
-//                    {
-//                        controlforce = controlforce.normalized * Overload;
-//                    }
-
-//                    if (ICIsActivaed)
-//                    {
-//                        InertiaControl();
-//                    }
-
-//                    Vector3 Breakforce = this.vessel.ActionGroups.groups[5] ? (-this.vessel.GetSrfVelocity()).normalized * Mathf.Min(this.vessel.GetSrfVelocity().magnitude / Time.fixedDeltaTime, Overload * 10f) - gee * 0.9f : Vector3.zero;
-//                    controlforce += Breakforce;
-
-//                }
-//                foreach (Part p in this.vessel.parts)
-//                {
-
-//                    if ((p.physicalSignificance == Part.PhysicalSignificance.FULL) && (p.rb != null))
-//                    {
-//                        p.AddForce(controlforce * p.rb.mass);
-//                    }
-
-//                }
-
-
-//                if (agActivated == true)
-//                {
-//                    foreach (Part p in this.vessel.parts)
-//                    {
-//                        if ((p.physicalSignificance == Part.PhysicalSignificance.FULL) && (p.rb != null))
-//                        {
-//                            p.AddForce(-gee * p.rb.mass);
-//                        }
-//                    }
-//                }
-
-//            }
-//            void InertiaControl()
-//            {
-
-//                float DirFlag = 0;
-//                if (Airspeed.y < 0)
-//                {
-//                    DirFlag = 2;
-//                }
-//                Vector3 InertiaForce = Vector3.zero;
-//                float ReD = 5000;
-//                Vessel target = null;
-//                if (this.vessel.targetObject != null)
-//                {
-//                    target = this.vessel.targetObject.GetVessel();
-//                    ReD = Vector3.Distance(this.vessel.transform.position, target.transform.position);
-//                }
-//                if (target && ReD < 3000)
-//                {
-//                    Vector3 RelVel = this.vessel.transform.InverseTransformDirection(this.vessel.rb_velocity - target.rb_velocity);
-//                    Vector3 yawsForce = (x == 0 ? RelVel.x : -x) * -this.vessel.transform.right;
-//                    Vector3 pitchsForce = (y == 0 ? RelVel.z : -y) * -this.vessel.transform.forward;
-//                    Vector3 FrontForce = (RelVel.y - 10 * z < 0 && RelVel.y > 0 ? -z : RelVel.y) * -this.vessel.transform.up;
-//                    InertiaForce = hvActivated ? Vector3.ProjectOnPlane(yawsForce + pitchsForce + FrontForce, gee.normalized) : yawsForce + pitchsForce + FrontForce;
-//                    ICactivated = true;
-//                }
-//                else
-//                {
-//                    if (target && ICactivated)
-//                    {
-//                        ICactivated = false;
-//                        ICDeactivate();
-//                    }
-//                    else
-//                    {
-//                        Vector3 yawsForce = (x == 0 ? Airspeed.x : -x) * -this.vessel.transform.right;
-//                        Vector3 pitchsForce = (y == 0 ? Airspeed.z : -y) * -this.vessel.transform.forward;
-//                        Vector3 FrontForce = Airspeed.y * -this.vessel.transform.up * DirFlag;
-//                        InertiaForce = hvActivated ? Vector3.ProjectOnPlane(yawsForce + pitchsForce + FrontForce, gee.normalized) : yawsForce + pitchsForce + FrontForce;
-//                        if (InertiaForce.magnitude > Overload)
-//                        {
-//                            InertiaForce = InertiaForce.normalized * Overload * 10;
-//                        }
-//                    }
-//                }
-//                controlforce += (InertiaForce) / Time.fixedDeltaTime / enginecount;
-//            }
-//        }
-//    }
-//}
-
-//[Flags]
-//public enum GNFlags : uint
-//{
-//    None = 0,
-//    Ignited = 1 << 0, // Engine On/Off
-//    AntiGravity = 1 << 1, // Antigravity On/Off
-//    Hover = 1 << 2, // Hover mode On/Off
-//    TransAM = 1 << 3, // Trans-AM mode On/Off
-//    InertiaControl = 1 << 4, // Future Use
-//    Modified = 1 << 5, // Future Use
-//}
-
-//public struct GNPhysicalState
-//{
-//    public Part part;            // 対象パーツ（必須）
-//    public GNFlags flags;        // まとめて渡す
-
-//    // チューニング・入力（必要に応じて増やせる）
-//    public float fuelEfficiency; // 消費係数
-//    public float particleOutputRate;   // 生成(or 変換)レート
-//    public float maxG; // Target G for Full throttle, if ship is too heavy, actual G will be lower.
-//    public float phaseShift; // For Twin-drive Sync rate.
-
-//    public static GNPhysicalState Empty => new GNPhysicalState { part = null, flags = GNFlags.None, fuelEfficiency = 0f, particleOutputRate = 0f, maxG = 0f, phaseShift = 0f };
-//}
-
-//public static class GNPhysics
-//{
-//    public static void SetOff(in GNPhysicalState ps)
-//    {
-//        if (ps.part == null) return;//part is required.
-
-//    }
-
-//    // Every FixedUpdate
-//    public static void UpdatePhysics(ref GNPhysicalState ps)
-//    {
-//        // sanity check
-//        var Vessel = ps.part.vessel;
-//        var resDef = PartResourceLibrary.Instance.GetDefinition("GNparticle");
-//        Debug.Log("[GN] GNPhysics UpdatePhysics Run Resource id:" + resDef);
-//        //if (resDef == null) return;
-
-//        // local variables
-//        var totalDrivePower = 0f;
-//        var agCount = 0;
-//        var thrusterCount = 0;
-//        float acceleration = 0f;
-//        var particleDrain = 0f;
-//        Vector3 forceDirection = Vector3.zero;
-
-//        // is this drive on? -> no,return, yes, continue
-//        if (ps.part == null || ps.part.vessel == null) return;
-
-//        // is TRANS-AM on? -> output 3x power(particle rate 3x)
-//        // part module triples output so ignore here.
-
-//        // is hover on? -> PID control vertical speed to 0
-//        if (ps.flags == GNFlags.Hover)
-//        {
-//            // PID control vertical speed to 0
-//        }
-
-//        // Count how many antigravity-on drives in vessel? -> -gee/agCount, if agCount=0, no -gee
-//        // calculate total drivePower. find every GNDrive/GNDriveTau/GNCondenserDrive/GNThruster -> sum <drives>.drivePower.
-//        // thrusterCount is used to average force when apply to parts.
-//        foreach (Part p in Vessel.parts)
-//        {
-//            foreach (PartModule m in p.Modules)
-//            {
-//                if (m is GNDriveUnit drive)
-//                {
-//                    if (drive.engineOn) { totalDrivePower += drive.drivePower; thrusterCount++; }
-//                    if (drive.antiGravityOn) agCount++;
-//                }
-//                else if (m is GNDriveTauUnit drivetau)
-//                {
-//                    if (drivetau.engineOn) { totalDrivePower += drivetau.drivePower; thrusterCount++; }
-//                    if (drivetau.antiGravityOn) agCount++;
-//                }
-//                else if (m is GNCondenserDriveUnit condenser)
-//                {
-//                    if (condenser.engineOn) { totalDrivePower += condenser.drivePower; thrusterCount++; }
-//                    if (condenser.antiGravityOn) agCount++;
-//                }
-//                else if (m is GNThrusterUnit thruster)
-//                {
-//                    if (thruster.engineOn) { totalDrivePower += thruster.drivePower; thrusterCount++; }
-//                }
-//            }
-//            Debug.Log("[GN] Total Drive Power: " + totalDrivePower.ToString("F3") + " m/s * kg/s, Thruster Count: " + thrusterCount + ", AG Count: " + agCount);
-//        }
-
-//        // if thrusterCount=0 and agCount=0, return.
-//        if (thrusterCount == 0 && agCount == 0) return;
-
-//        // calculate total mass of vessel -> vessel.GetTotalMass()
-//        // calculate acceleration = totalDrivePower(m/s * kg/s)/totalMass(kg) -> m/s^2
-//        double totalMassKg = Vessel.GetTotalMass() * 1000.0;
-//        acceleration = (float)(totalMassKg > 0.0 ? (totalDrivePower * 1000 / totalMassKg) : 0f);
-//        if (ps.maxG > 0f && acceleration > ps.maxG) acceleration = ps.maxG;
-
-//        // calculate forcedirection = up*(throttle-Z)+forward*(-Y)+right*(-X)
-//        forceDirection = Vessel.ReferenceTransform.up * (Vessel.ctrlState.mainThrottle - Vessel.ctrlState.Z) + Vessel.ReferenceTransform.forward * (-Vessel.ctrlState.Y) + Vessel.ReferenceTransform.right * (-Vessel.ctrlState.X);
-//        if (forceDirection.sqrMagnitude > 1e-6f) forceDirection.Normalize();
-
-//        // calculate particle consumption = vessel.GetTotalMass() * acceleration * fuelEfficiency
-//        double particleDrainPerSec = (totalMassKg * acceleration * ps.fuelEfficiency * 0.001); // 単位は好きに定義
-//        double stepDemand = particleDrainPerSec * TimeWarp.fixedDeltaTime;
-//        if (stepDemand > 0)
-//        {
-//            // Vessel全体から消費（ID指定）
-//            //double taken = Vessel.RequestResource(ps.part, resDef.id, stepDemand, true);
-//            //if (taken < stepDemand * 0.1) // 足りないなら停止など
-//            //{
-//            //    ps.flags &= ~GNFlags.Ignited;
-//            //    return;
-//            //}
-//        }
-//        //particleDrain = Vessel.GetTotalMass() * acceleration * ps.fuelEfficiency;
-//        //Vessel.RequestResource(ps.part, resDef.id, particleDrain * TimeWarp.fixedDeltaTime, true);
-
-//        // apply acceleration to every part in vessel -> part.AddForce((acceleration/thrusterCount)*part.rb.mass*forceDirection)
-//        if (thrusterCount > 0 && forceDirection.sqrMagnitude > 0)
-//        {
-//            foreach (Part part in Vessel.parts)
-//            {
-//                if (part.physicalSignificance == Part.PhysicalSignificance.FULL && part.rb != null)
-//                {
-//                    // F = m * a / 台数
-//                    Vector3 force = (acceleration / thrusterCount) * part.rb.mass * forceDirection;
-//                    part.AddForce(force);
-//                    Debug.Log("[GN] Apply Force: " + force.ToString("F3") + " to Part: " + part.partInfo.title);
-//                }
-//            }
-//        }
-
-//        if (((ps.flags & GNFlags.AntiGravity) != 0) && agCount > 0)
-//        {
-//            Vector3 gee = FlightGlobals.getGeeForceAtPosition(Vessel.transform.position); // N/kg（≒ m/s^2） * kg でNに
-//            foreach (Part part in Vessel.parts)
-//            {
-//                if (part.physicalSignificance == Part.PhysicalSignificance.FULL && part.rb != null)
-//                {
-//                    // AGドライブ数で割って相殺量を分配（thrusterCountでは割らない）
-//                    Vector3 anti = -(gee / agCount) * part.rb.mass;
-//                    part.AddForce(anti);
-//                    Debug.Log("[GN] Apply Force: " + anti.ToString("F3") + " to Part: " + part.partInfo.title);
-//                }
-//            }
-//        }
-//    }
-//}
