@@ -82,8 +82,6 @@ namespace GNTechnology
 
             // Engine:On => update visual effects
             float level = GetLevel(vs);
-            
-            // Debug.Log("[GN] Visual effect level: " + level);
 
             UpdateRotor(vs.Rotors, vs.RotorSpeed,level);
             UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level);
@@ -100,23 +98,23 @@ namespace GNTechnology
 
             var res = vs.part.Resources["GNparticle"];
             if (res == null || res.maxAmount <= 0) return 0f;
-            Debug.Log("[GN] GNparticle amount: " + res.amount + "/" + res.maxAmount);
+            //Debug.Log("[GN] GNparticle amount: " + res.amount + "/" + res.maxAmount);
             return (float)(res.amount / res.maxAmount);
         }
 
         private static void UpdateRotor(Transform[] rotors, float rotorspeed, float level)// rotate rotors
         {
-            Debug.Log("[GN] Updating rotors.");
+            //Debug.Log("[GN] Updating rotors.");
             if (rotors == null) return;
             float dt = Time.deltaTime;
             float speed = rotorspeed * level; // magic number should be adjusted later.
-            Debug.Log("[GN] Rotor speed: " + speed);
+            //Debug.Log("[GN] Rotor speed: " + speed);
 
             // Rotation control logic here.
-            Debug.Log("[GN] Rotors count: " + rotors.Length);
+            //Debug.Log("[GN] Rotors count: " + rotors.Length);
             for (int i = 0; i < rotors.Length; i++)
             {
-                Debug.Log("[GN] Updating rotor " + i);
+                //Debug.Log("[GN] Updating rotor " + i);
                 var t = rotors[i];
                 if (t) t.Rotate(0f, speed * dt, 0f, Space.Self);
             }
@@ -163,7 +161,7 @@ namespace GNTechnology
             {
                 var e = emitters[i];
                 if (!e) continue;
-                Debug.Log("[GN] ParticleEmitter found.");
+                //Debug.Log("[GN] ParticleEmitter found.");
 
                 // Smoothly adjust emission rates
                 e.enabled = true;

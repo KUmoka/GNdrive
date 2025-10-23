@@ -17,9 +17,13 @@ namespace GNTechnology
         public bool TaOn;
         public bool UnSync;
         public bool ECOn;
+        public bool SafeGuard;
         public float ParticlePower;
         public float ParticleGenRate;
         public float MaxG;
+
+        //Twin drive parameter
+        public float Individuality;
 
         public static GNPhysicsState Empty => new GNPhysicsState
         {
@@ -29,9 +33,11 @@ namespace GNTechnology
             TaOn = false,
             UnSync = false,
             ECOn = false,
+            SafeGuard = true,
             ParticlePower = 0f,
             ParticleGenRate = 0f,
-            MaxG = 0f
+            MaxG = 0f,
+            Individuality = 0f
         };
     }
 
@@ -49,7 +55,7 @@ namespace GNTechnology
             if (ps.part == null) return;
             var vessel = ps.part.vessel;
             if (vessel == null) return;
-            if (!HighLogic.LoadedSceneIsFlight || !vessel.isActiveVessel) return;
+            if (!HighLogic.LoadedSceneIsFlight) return; //  || !vessel.isActiveVessel 
             if (vessel.ReferenceTransform == null) return; // prevents NRE when switching vessels
 
             // input state 
@@ -65,6 +71,7 @@ namespace GNTechnology
             float accelMag = 0f;
             int driveCount = 0, agCount = 0, hvCount = 0, taCount = 0;
             double ECReqGen = 0f;
+            double ecUsed = 0f;
 
             // Normalize input vector
             float norm = Mathf.Sqrt(x * x + y * y + z * z);
@@ -88,9 +95,8 @@ namespace GNTechnology
             Vector3 upHv = -(Vector3)gAcc.normalized;   // 上向き（AddForceに掛ける方向）            
             float vVert = (float)vessel.verticalSpeed;// 縦速度（KSPなら vessel.verticalSpeed が地表基準の鉛直速度）
             float aMax = Mathf.Max(0f, ps.MaxG * 9.80665f);// ユーザー設定上限（例：MaxG[G] → [m/s^2]へ換算）ps.MaxG が 1=1G といった意味なら：
-            float aHover = ps.HvOn ? ComputeHoverAccel(vVert, gLocal, Time.fixedDeltaTime, aMax) : 0f;// ホバー用の上向き必要加速度を1回だけ計算
+            float aHover = ps.HvOn ? ComputeHoverAccel(vVert, gLocal, Time.fixedDeltaTime, aMax) : 0f;// ホバー用の上向き必要加速度を1回だけ計算  
 
-            // Drive, particle power count
             foreach (Part p1 in vessel.parts)
             {
                 foreach (PartModule m in p1.Modules)
@@ -122,7 +128,7 @@ namespace GNTechnology
                 }
             }
 
-            // TA mode adjustments
+            // TRANS-AM mode adjustments
             if (ps.TaOn)
             {
                 actualG *= 3f; // Increase actualG in TA mode
@@ -136,8 +142,17 @@ namespace GNTechnology
                 if (ps.ECOn)
                 {
                     ECReqGen = ps.ParticleGenRate * (TD.maxAmount - 2 * TD.amount) * 0.1; // EC required proportional to lack of TD
-                    ps.part.RequestResource("ElectricCharge", ECReqGen * TimeWarp.fixedDeltaTime);
-                    ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime));
+
+                    if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount - 1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime)
+                    {
+                        ps.part.RequestResource("ElectricCharge", ECReqGen * TimeWarp.fixedDeltaTime);
+                        ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime));
+                    }
+                    
+                    if (ps.part.RequestResource("ElectricCharge", 0.5 * TimeWarp.fixedDeltaTime) <= 0)
+                    {
+                        ps.ECOn = false;
+                    }
                 }
             }
 
@@ -150,14 +165,12 @@ namespace GNTechnology
 
             // consumption calculation
             double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime;
-            Debug.Log("[GN] Particle consumption calculated: " + consumption.ToString("F4"));
-            ps.part.RequestResource("GNparticle", consumption);
+            TotalParticlePower *= TimeWarp.fixedDeltaTime; // compensation for consumption
 
             // limit factor calculation
-            if (consumption > 0 && consumption > TotalParticlePower)
-                limitFactor = (float)(TotalParticlePower / consumption); // 0..1想定
-            if (ps.UnSync)
-                limitFactor = 0.001f; // UnSync mode -> power almost off.Later think this to a better implementation.
+            // 0..1想定,When particle generation on, drive power should suppress sustainable level
+            if (consumption > 0 && consumption > TotalParticlePower && ps.SafeGuard) limitFactor = (float)((TotalParticlePower) / consumption);
+            if (ps.UnSync)limitFactor = 0.001f; // UnSync mode -> power almost off.Later think this to a better implementation.
             if (ps.part.Resources["GNparticle"].amount < 1)
             {
                 limitFactor = 0f; // No Particle -> power off
@@ -165,7 +178,13 @@ namespace GNTechnology
                 ps.TaOn = false; // TRANS-AM off
                 ps.AgOn = false; // AG off
                 ps.HvOn = false; // hover off
+                return;
             }
+
+            //Debug.Log("[GN] consumption =" + consumption);
+            //Debug.Log("[GN] TotalParticlePower =" + TotalParticlePower);
+            //Debug.Log("[GN] limitFactor =" + limitFactor);
+            //Debug.Log("[GN] SafeGuard =" + ps.SafeGuard);
 
             // --- Force application ---
             foreach (Part p2 in vessel.parts)
@@ -190,6 +209,9 @@ namespace GNTechnology
                     ps.part.RequestResource("GNparticle", consumptionHv);
                 }
             }
+
+            // apply consumption
+            ps.part.RequestResource("GNparticle", consumption * limitFactor);
         }
 
         static float _hoverLastA = 0f;      // 前回の上向き加速度 [m/s^2]（スルーレート用）
