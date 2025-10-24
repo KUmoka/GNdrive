@@ -1,5 +1,6 @@
 ﻿using GNTechnology;
 using UnityEngine;
+using static GNTechnology.GNSynchronizer;
 
 namespace GNTechnology
 {
@@ -122,8 +123,10 @@ namespace GNTechnology
 
         public static void SynchronizeOtherTargetDrive(OnOffList OnOffLst, Vessel vessel, uint myID)
         {
+            // no vessel -> return
             if (vessel == null) return;
 
+            // parts find
             foreach (var p in vessel.parts)
             {
                 // prevent drive self overwrite.
@@ -131,6 +134,7 @@ namespace GNTechnology
 
                 // Tau drive.
                 var taus = p.FindModulesImplementing<GNDriveTauSystem>();
+
                 foreach (var m in taus)
                 {
                     if (!m.SyOn) continue;
@@ -144,6 +148,7 @@ namespace GNTechnology
 
                 // GN drive.
                 var gns = p.FindModulesImplementing<GNDriveSystem>();
+
                 foreach (var m in gns)
                 {
                     if (!m.SyOn) continue;
@@ -153,6 +158,46 @@ namespace GNTechnology
                     m.accel = OnOffLst.MaxG;
                 }
             }
+        }
+
+        public static float SynchronizationRate(Vessel vessel, GNPhysicsState ps)
+        {
+            if (vessel == null) return 1f;
+
+            // psの値を、他のドライブとのindividualityの差を用いて設定し、ツインドライブシステムを実装する
+            foreach (var p in vessel.parts)
+            {
+                // prevent drive self overwrite.
+                if (p.persistentId == myID) continue;
+
+                // Tau drive.
+                var taus = p.FindModulesImplementing<GNDriveTauSystem>();
+
+                foreach (var m in taus)
+                {
+                    if (!m.SyOn) continue;
+                    m.engineOn = OnOffLst.LengineOn;
+                    m.agOn = OnOffLst.LagOn;
+                    m.hvOn = OnOffLst.LhvOn;
+                    m.taOn = OnOffLst.LtaOn;
+                    m.accel = OnOffLst.MaxG;
+                    m.ECOn = OnOffLst.LECOn;
+                }
+
+                // GN drive.
+                var gns = p.FindModulesImplementing<GNDriveSystem>();
+
+                foreach (var m in gns)
+                {
+                    if (!m.SyOn) continue;
+                    m.agOn = OnOffLst.LagOn;
+                    m.hvOn = OnOffLst.LhvOn;
+                    m.taOn = OnOffLst.LtaOn;
+                    m.accel = OnOffLst.MaxG;
+                }
+            }
+
+            return 1f;
         }
     }
 }

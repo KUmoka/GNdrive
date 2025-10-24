@@ -10,20 +10,21 @@ namespace GNTechnology
 {
     public struct GNPhysicsState
     {
-        public Part part;
-        public bool EngineState;
-        public bool AgOn;
-        public bool HvOn;
-        public bool TaOn;
-        public bool UnSync;
-        public bool ECOn;
-        public bool SafeGuard;
-        public float ParticlePower;
-        public float ParticleGenRate;
-        public float MaxG;
+        public Part part; // the part that module attached on.
+        public bool EngineState; // Engine on/off.
+        public bool AgOn; // Anti-gravity
+        public bool HvOn; // Hover
+        public bool TaOn; // TRANS-AM
+        public bool ECOn; // EC to particle converter.
+        public bool SafeGuard; // limit drive power or not to prevent dry-up.
+        public float ParticlePower; // Max power of the drive can exert
+        public float ParticleGenRate; // particle generation rate
+        public float MaxG; // for max accerelation
 
         //Twin drive parameter
         public float Individuality;
+        public float SyncRate; // for Twin-drive
+        public bool UnSync; // below twin drive sync rate, this = true.
 
         public static GNPhysicsState Empty => new GNPhysicsState
         {
@@ -31,13 +32,14 @@ namespace GNTechnology
             AgOn = false,
             HvOn = false,
             TaOn = false,
-            UnSync = false,
             ECOn = false,
             SafeGuard = true,
             ParticlePower = 0f,
             ParticleGenRate = 0f,
             MaxG = 0f,
-            Individuality = 0f
+            Individuality = 0f,
+            SyncRate = 1f,
+            UnSync = false
         };
     }
 
@@ -131,7 +133,7 @@ namespace GNTechnology
             // TRANS-AM mode adjustments
             if (ps.TaOn)
             {
-                actualG *= 3f; // Increase actualG in TA mode
+                actualG *= 3f; //Increase actualG in TA mode
                 TotalParticlePower = TotalParticlePower + 2f * ps.ParticlePower; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
             }
 

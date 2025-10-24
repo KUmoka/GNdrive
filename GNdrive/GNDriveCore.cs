@@ -59,7 +59,7 @@ namespace GNTechnology
         public string ES = "Deactivated";
 
         // KSP field for Particle/EC Generation rate (Condenser = 0)
-        [KSPField(guiName = "Particle Generation", guiActive = false, isPersistant = true)]
+        [KSPField(guiName = "Particle Generation", guiActive = true, guiActiveEditor = true, isPersistant = true)]
         public float ParticleGeneration = 0f;
 
         [KSPField(guiName = "ElectricCharge Generation", guiActive = false, isPersistant = true)]
@@ -161,7 +161,11 @@ namespace GNTechnology
         private void SyncUpdate()
         {
             // Desyncing
-            if (!SyOn) return;
+            if (!SyOn)
+            {
+                ps.SyncRate = 1f;
+                return;
+            } 
 
             //Synching
             var current = new OnOffList
@@ -565,6 +569,9 @@ namespace GNTechnology
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
             Debug.Log($"[GN] vs.Mode={vs.Mode}");
+
+            // For Twin drive
+            CompressIndividuality();
         }
 
         public override void OnUpdate()
@@ -583,6 +590,11 @@ namespace GNTechnology
         {
             base.OnFixedUpdate();
             ps.SafeGuard = ps.ECOn;
+        }
+
+        private void CompressIndividuality()
+        {
+            DriveIndividuality *= 0.5f;
         }
     }
 
