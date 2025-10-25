@@ -1,4 +1,5 @@
 ﻿using GNTechnology;
+using System.Collections.Generic;
 using UnityEngine;
 using static GNTechnology.GNSynchronizer;
 
@@ -121,16 +122,24 @@ namespace GNTechnology
             public static bool operator !=(OnOffList a, OnOffList b) => !a.Equals(b);
         }
 
-        public static void SynchronizeOtherTargetDrive(OnOffList OnOffLst, Vessel vessel, uint myID)
+        public static void SynchronizeOtherTargetDrive(OnOffList OnOffLst, Vessel vessel, uint myID, GNPhysicsState ps)
         {
             // no vessel -> return
-            if (vessel == null) return;
+            if (vessel == null)
+            {
+                return;
+            }
+
+            // variables
+            List<float> deviationTau = new List<float>();
+            List<float> deviation = new List<float>();
+            bool myDriveIsTau = false;
 
             // parts find
             foreach (var p in vessel.parts)
             {
                 // prevent drive self overwrite.
-                if (p.persistentId == myID) continue;
+                // if (p.persistentId == myID) continue; needs add myself now.
 
                 // Tau drive.
                 var taus = p.FindModulesImplementing<GNDriveTauSystem>();
@@ -144,6 +153,10 @@ namespace GNTechnology
                     m.taOn = OnOffLst.LtaOn;
                     m.accel = OnOffLst.MaxG;
                     m.ECOn = OnOffLst.LECOn;
+
+                    // List.add
+                    deviationTau.Add(m.DriveIndividuality);
+                    if (myID == p.persistentId) myDriveIsTau = true;
                 }
 
                 // GN drive.
@@ -156,48 +169,61 @@ namespace GNTechnology
                     m.hvOn = OnOffLst.LhvOn;
                     m.taOn = OnOffLst.LtaOn;
                     m.accel = OnOffLst.MaxG;
+
+                    // List.add
+                    deviation.Add(m.DriveIndividuality);
                 }
             }
+
+            int NTau = deviationTau.Count;
+            int Ngn = deviation.Count;
+
+            // No sync.
+            if (Ngn == 0 && NTau == 0)
+            {
+                Debug.LogError("no sync drives");
+                ps.SyncRate = 1f;
+                return;
+            }
+
+            // calculation.
+            if (myDriveIsTau)
+            {
+                ps.SyncRate = NTau * Mathf.Pow((1 - VarianceTo01(Variance(deviationTau, Mean(deviationTau)))), NTau);
+                Debug.Log("NTau = " + NTau);
+                Debug.Log("NTau = " + NTau);
+            }
+            else if (!myDriveIsTau)
+            {
+                ps.SyncRate = Ngn * Mathf.Pow((1 - VarianceTo01(Variance(deviation, Mean(deviation)))), Ngn);
+                Debug.Log("Ngn = " + Ngn);
+            } 
         }
 
-        public static float SynchronizationRate(Vessel vessel, GNPhysicsState ps)
+        private static float Mean(IList<float> xs)
         {
-            if (vessel == null) return 1f;
+            if (xs == null || xs.Count == 0) return 0f;
+            float s = 0f;
+            for (int i = 0; i < xs.Count; i++) s += xs[i];
+            return s / xs.Count;
+        }
 
-            // psの値を、他のドライブとのindividualityの差を用いて設定し、ツインドライブシステムを実装する
-            foreach (var p in vessel.parts)
+        private static float Variance(IList<float> xs, float mean)
+        {
+            if (xs == null || xs.Count <= 1) return 0f;
+            float s2 = 0f;
+            for (int i = 0; i < xs.Count; i++)
             {
-                // prevent drive self overwrite.
-                if (p.persistentId == myID) continue;
-
-                // Tau drive.
-                var taus = p.FindModulesImplementing<GNDriveTauSystem>();
-
-                foreach (var m in taus)
-                {
-                    if (!m.SyOn) continue;
-                    m.engineOn = OnOffLst.LengineOn;
-                    m.agOn = OnOffLst.LagOn;
-                    m.hvOn = OnOffLst.LhvOn;
-                    m.taOn = OnOffLst.LtaOn;
-                    m.accel = OnOffLst.MaxG;
-                    m.ECOn = OnOffLst.LECOn;
-                }
-
-                // GN drive.
-                var gns = p.FindModulesImplementing<GNDriveSystem>();
-
-                foreach (var m in gns)
-                {
-                    if (!m.SyOn) continue;
-                    m.agOn = OnOffLst.LagOn;
-                    m.hvOn = OnOffLst.LhvOn;
-                    m.taOn = OnOffLst.LtaOn;
-                    m.accel = OnOffLst.MaxG;
-                }
+                float d = xs[i] - mean;
+                s2 += d * d;
             }
+            return s2 / (xs.Count - 1); // 不偏分散
+        }
+        private static float Clamp01(float v) => Mathf.Clamp01(v);
 
-            return 1f;
+        private static float VarianceTo01(float variance, float scale = 4f)
+        {
+            return Clamp01(variance * scale);
         }
     }
 }

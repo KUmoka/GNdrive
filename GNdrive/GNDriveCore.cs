@@ -79,6 +79,9 @@ namespace GNTechnology
         [KSPField(guiActiveEditor = true, guiActive = true, isPersistant = true, guiName = "Accel Divided")]
         private float AccelDiv = 1f;
 
+        [KSPField(guiActiveEditor = true, guiActive = true, isPersistant = true, guiName = "Synchronize Rate")]
+        public float SynchronizeRate = 0f;
+
         public override void OnAwake()
         {
             base.OnAwake();
@@ -180,7 +183,10 @@ namespace GNTechnology
 
             if (OnOff == current) return;
             else OnOff = current;
-            GNSynchronizer.SynchronizeOtherTargetDrive(OnOff, vessel, part.persistentId);
+            GNSynchronizer.SynchronizeOtherTargetDrive(OnOff, vessel, part.persistentId, ps);
+            SetMaxG(0, 5 * ps.SyncRate);
+            SynchronizeRate = ps.SyncRate;
+
         }
 
         private void VisualUpdate()
