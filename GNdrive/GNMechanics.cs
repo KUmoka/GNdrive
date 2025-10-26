@@ -138,9 +138,6 @@ namespace GNTechnology
             // parts find
             foreach (var p in vessel.parts)
             {
-                // prevent drive self overwrite.
-                // if (p.persistentId == myID) continue; needs add myself now.
-
                 // Tau drive.
                 var taus = p.FindModulesImplementing<GNDriveTauSystem>();
 
@@ -181,7 +178,6 @@ namespace GNTechnology
             // No sync.
             if (Ngn == 0 && NTau == 0)
             {
-                Debug.LogError("no sync drives");
                 ps.SyncRate = 1f;
                 return;
             }
@@ -191,16 +187,11 @@ namespace GNTechnology
             {
                 var n1 = VarianceTo01(Variance(deviationTau, Mean(deviationTau)));
                 ps.SyncRate = NTau * Mathf.Pow((1 - n1), NTau);
-                Debug.Log("NTau = " + NTau);
-                Debug.Log("n1 = " + n1);
-
             }
             else if (!myDriveIsTau)
             {
                 var n2 = VarianceTo01(Variance(deviation, Mean(deviation)));
                 ps.SyncRate = Ngn * Mathf.Pow((1 - n2), Ngn);
-                Debug.Log("Ngn = " + Ngn);
-                Debug.Log("n2 = " + n2);
             } 
         }
 

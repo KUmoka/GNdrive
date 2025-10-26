@@ -143,17 +143,21 @@ namespace GNTechnology
                 var TD = ps.part.Resources["TopologicalDefects"];
                 if (ps.ECOn)
                 {
+                    // GN and Tau
                     ECReqGen = ps.ParticleGenRate * (TD.maxAmount - 2 * TD.amount) * 0.1; // EC required proportional to lack of TD
 
-                    if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount - 1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime)
+                    // Tau drive
+                    if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount - 1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime && TD.amount <= 0.01)
+                    {
+                        var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen * TimeWarp.fixedDeltaTime);
+                        ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime));
+
+                        if (Pulled <= 0.5 * TimeWarp.fixedDeltaTime) ps.ECOn = false;
+                    }
+                    else // GN drive
                     {
                         ps.part.RequestResource("ElectricCharge", ECReqGen * TimeWarp.fixedDeltaTime);
                         ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime));
-                    }
-                    
-                    if (ps.part.RequestResource("ElectricCharge", 0.5 * TimeWarp.fixedDeltaTime) <= 0)
-                    {
-                        ps.ECOn = false;
                     }
                 }
             }
