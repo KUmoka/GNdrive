@@ -150,14 +150,14 @@ namespace GNTechnology
                     if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount && TD.amount <= 0.5)
                     {
                         var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen * TimeWarp.fixedDeltaTime);
-                        ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime));
+                        ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * ps.SyncRate * TimeWarp.fixedDeltaTime));
 
                         if (Pulled <= 0.5 * TimeWarp.fixedDeltaTime) ps.ECOn = false;
                     }
                     else if(TD.amount > 0.5)// GN drive
                     {
                         ps.part.RequestResource("ElectricCharge", ECReqGen * TimeWarp.fixedDeltaTime);
-                        ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime));
+                        ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * ps.SyncRate * TimeWarp.fixedDeltaTime));
                     }
                 }
             }
