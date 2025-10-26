@@ -147,14 +147,14 @@ namespace GNTechnology
                     ECReqGen = ps.ParticleGenRate * (TD.maxAmount - 2 * TD.amount) * 0.1; // EC required proportional to lack of TD
 
                     // Tau drive
-                    if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount - 1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime && TD.amount <= 0.01)
+                    if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount && TD.amount <= 0.5)
                     {
                         var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen * TimeWarp.fixedDeltaTime);
                         ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime));
 
                         if (Pulled <= 0.5 * TimeWarp.fixedDeltaTime) ps.ECOn = false;
                     }
-                    else // GN drive
+                    else if(TD.amount > 0.5)// GN drive
                     {
                         ps.part.RequestResource("ElectricCharge", ECReqGen * TimeWarp.fixedDeltaTime);
                         ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * TimeWarp.fixedDeltaTime));
