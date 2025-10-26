@@ -167,6 +167,7 @@ namespace GNTechnology
             if (!SyOn)
             {
                 ps.SyncRate = 1f;
+                SetMaxG(0, 5 * ps.SyncRate);
                 return;
             } 
 
@@ -183,7 +184,7 @@ namespace GNTechnology
 
             if (OnOff == current) return;
             else OnOff = current;
-            GNSynchronizer.SynchronizeOtherTargetDrive(OnOff, vessel, part.persistentId, ps);
+            GNSynchronizer.SynchronizeOtherTargetDrive(OnOff, vessel, part.persistentId, ref ps);
             SetMaxG(0, 5 * ps.SyncRate);
             SynchronizeRate = ps.SyncRate;
 
@@ -639,6 +640,7 @@ namespace GNTechnology
             part.force_activate(); // Keep part activated. 
             engineOn = true; // GN Drive is always on.
             ECOn = true; // GN Drive generates EC through EC consumption calculation method.
+            ps.SyncRate = 1f;
         }
 
         public override void OnUpdate()

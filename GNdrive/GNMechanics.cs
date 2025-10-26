@@ -122,7 +122,7 @@ namespace GNTechnology
             public static bool operator !=(OnOffList a, OnOffList b) => !a.Equals(b);
         }
 
-        public static void SynchronizeOtherTargetDrive(OnOffList OnOffLst, Vessel vessel, uint myID, GNPhysicsState ps)
+        public static void SynchronizeOtherTargetDrive(OnOffList OnOffLst, Vessel vessel, uint myID, ref GNPhysicsState ps)
         {
             // no vessel -> return
             if (vessel == null)
@@ -189,14 +189,18 @@ namespace GNTechnology
             // calculation.
             if (myDriveIsTau)
             {
-                ps.SyncRate = NTau * Mathf.Pow((1 - VarianceTo01(Variance(deviationTau, Mean(deviationTau)))), NTau);
+                var n1 = VarianceTo01(Variance(deviationTau, Mean(deviationTau)));
+                ps.SyncRate = NTau * Mathf.Pow((1 - n1), NTau);
                 Debug.Log("NTau = " + NTau);
-                Debug.Log("NTau = " + NTau);
+                Debug.Log("n1 = " + n1);
+
             }
             else if (!myDriveIsTau)
             {
-                ps.SyncRate = Ngn * Mathf.Pow((1 - VarianceTo01(Variance(deviation, Mean(deviation)))), Ngn);
+                var n2 = VarianceTo01(Variance(deviation, Mean(deviation)));
+                ps.SyncRate = Ngn * Mathf.Pow((1 - n2), Ngn);
                 Debug.Log("Ngn = " + Ngn);
+                Debug.Log("n2 = " + n2);
             } 
         }
 
