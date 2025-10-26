@@ -107,7 +107,8 @@ namespace GNTechnology
             EnsureIndividuality();
             DecideColor();
 
-            Debug.Log(listT.Count);
+            // System Initialize
+            SystemInit();
         }
 
         public override void OnUpdate()
@@ -125,6 +126,11 @@ namespace GNTechnology
         {
             base.OnFixedUpdate();
             PhysicsUpdate();
+        }
+
+        private void SystemInit()
+        {
+            part.force_activate(); // Keep part activated. 
         }
 
         private void VisualInit()
@@ -483,6 +489,8 @@ namespace GNTechnology
             vs.RotorSpeed = 180f; // thruster rotor speed
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
+
+            // Debug
             Debug.Log($"[GN] vs.Mode={vs.Mode}");
         }
 
@@ -522,8 +530,9 @@ namespace GNTechnology
             vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
-            Debug.Log($"[GN] vs.Mode={vs.Mode}");
 
+            // Debug
+            Debug.Log($"[GN] vs.Mode={vs.Mode}");
         }
 
         public override void OnUpdate()
@@ -534,6 +543,10 @@ namespace GNTechnology
                 agOn = false;
                 ps.AgOn = false;
                 ps.HvOn = true;
+            }
+            if (engineOn = false && part.Resources["GNparticle"].amount == 0)
+            {
+                ES = "Depleted";
             }
         }
 
@@ -575,10 +588,12 @@ namespace GNTechnology
             vs.ParticleColor = new Color(1f, 0f, 0.15f, 1f); // Red for condenser.
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
-            Debug.Log($"[GN] vs.Mode={vs.Mode}");
 
             // For Twin drive
             CompressIndividuality();
+
+            // Debug
+            Debug.Log($"[GN] vs.Mode={vs.Mode}");
         }
 
         public override void OnUpdate()
@@ -590,6 +605,10 @@ namespace GNTechnology
                 agOn = false;
                 ps.AgOn = false;
                 ps.HvOn = true;
+            }
+            if (engineOn = false && part.Resources["GNparticle"].amount == 0)
+            {
+                ES = "Depleted";
             }
         }
 
@@ -635,12 +654,12 @@ namespace GNTechnology
             vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
-            Debug.Log($"[GN] vs.Mode={vs.Mode}");
-
-            part.force_activate(); // Keep part activated. 
             engineOn = true; // GN Drive is always on.
             ECOn = true; // GN Drive generates EC through EC consumption calculation method.
             ps.SyncRate = 1f;
+
+            // Debug
+            Debug.Log($"[GN] vs.Mode={vs.Mode}");
         }
 
         public override void OnUpdate()
