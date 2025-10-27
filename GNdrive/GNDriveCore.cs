@@ -55,14 +55,14 @@ namespace GNTechnology
         public bool SyOn = false;
 
         // KSP field for indicate states
-        [KSPField(guiName = "Engine Status", guiActive = false, isPersistant = true)]
+        [KSPField(guiName = "Engine Status", guiActive = false, guiActiveEditor = false, isPersistant = true)]
         public string ES = "Deactivated";
 
         // KSP field for Particle/EC Generation rate (Condenser = 0)
         [KSPField(guiName = "Particle Generation", guiActive = true, guiActiveEditor = true, isPersistant = true)]
         public float ParticleGeneration = 0f;
 
-        [KSPField(guiName = "ElectricCharge Generation", guiActive = false, isPersistant = true)]
+        [KSPField(guiName = "ElectricCharge Generation", guiActive = false, guiActiveEditor = false, isPersistant = true)]
         public double ECGeneration = 0f;
 
         // KSP field for drive individuality
@@ -77,7 +77,7 @@ namespace GNTechnology
         public bool useAverageColor = true;
 
         [KSPField(guiActiveEditor = true, guiActive = true, isPersistant = true, guiName = "Accel Divided")]
-        private float AccelDiv = 1f;
+        public float AccelDiv = 1f;
 
         [KSPField(guiActiveEditor = true, guiActive = true, isPersistant = true, guiName = "Synchronize Rate")]
         public float SynchronizeRate = 0f;
@@ -155,16 +155,14 @@ namespace GNTechnology
                 return;
             }
             ps.part = part;
-            ps.ParticlePower = 1f; // default power
+            ps.ParticlePower = 1f; // default nonzero negligible value. 
         }
 
         private void StatusInit()
         {
-            Fields["ES"].guiActive = true;
-            if (HighLogic.LoadedSceneIsEditor)
-            {
-                Fields["ES"].guiActive = false;
-            }
+            // for debug only
+            Fields["useAverageColor"].guiActive = false;
+            Fields["useAverageColor"].guiActiveEditor = false;
         }
 
         private void SyncUpdate()
@@ -233,7 +231,7 @@ namespace GNTechnology
 
         private void StatusUpdate()
         {
-            if(ps.SyncRate < 0.)
+            if(ps.SyncRate < 0.5)
             if (engineOn)
             {
                 ES = "Activated";
@@ -413,25 +411,41 @@ namespace GNTechnology
 
         private void PAWInitialization()
         {
-            if (HighLogic.LoadedSceneIsEditor)
-            {
-                // Basic PAW
-                Fields["engineOn"].guiActive = false;
-                Fields["agOn"].guiActive = false;
-                Fields["hvOn"].guiActive = false;
-                Fields["taOn"].guiActive = false;
-                Fields["accel"].guiActive = false;
-                Fields["engineOn"].guiActiveEditor = false;
-                Fields["agOn"].guiActiveEditor = false;
-                Fields["hvOn"].guiActiveEditor = false;
-                Fields["taOn"].guiActiveEditor = false;
-                Fields["accel"].guiActiveEditor = false;
-                Fields["ES"].guiActive = false;
+            if (Fields == null) return;
 
-                // For Tau drive,
-                Fields["ECOn"].guiActive = false;
-                Fields["ECOn"].guiActiveEditor = false;
+            void Hide(string name)
+            {
+                var f = Fields[name];
+                if (f != null)
+                {
+                    f.guiActive = false;
+                    f.guiActiveEditor = false;
+                }
+                else
+                {
+                    Debug.LogWarning($"[GN] KSPField '{name}' not found (skipped).");
+                }
             }
+
+            // Basic PAW flight & editor
+            Hide("engineOn");
+            Hide("agOn");
+            Hide("hvOn");
+            Hide("taOn");
+            Hide("accel");
+            Hide("ES");
+            Hide("SyOn");
+
+            Hide("ParticleGeneration");
+            Hide("ECGeneration");
+            Hide("DriveIndividuality");
+            Hide("counts");
+            Hide("useAverageColor");
+            Hide("AccelDiv");
+            Hide("SynchronizeRate");
+
+            // Tau only
+            Hide("ECOn");
         }
 
         protected void PAWActivate(params string[] fieldNames)
@@ -479,7 +493,7 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("engineOn", "accel");
+                PAWActivate("engineOn", "accel", "ES");
             }
             else
             {
@@ -519,7 +533,7 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("engineOn", "agOn", "hvOn", "accel");
+                PAWActivate("engineOn", "agOn", "hvOn", "accel", "ES");
             }
             else
             {
@@ -576,12 +590,11 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("engineOn", "agOn", "hvOn", "accel", "SyOn");
-                PAWActivate("ECOn");
+                PAWActivate("engineOn", "agOn", "hvOn", "accel", "SyOn", "ECOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ES");
             }
             else
             {
-                PAWActivate("accel", "SyOn", "ECOn");
+                PAWActivate("accel", "SyOn", "ECOn", "DriveIndividuality", "ParticleGeneration");
             }
 
             vs.Mode = GNVisualMode.Drive;
@@ -643,20 +656,21 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("agOn", "hvOn","taOn", "accel", "SyOn"); // Always on Engine, Cannot turn off.
+                PAWActivate("agOn", "hvOn","taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ES"); // Always on Engine, Cannot turn off.
             }
             else
             {
-                PAWActivate("accel", "SyOn");
+                PAWActivate("accel", "DriveIndividuality", "ParticleGeneration");
             }
 
-            vs.Mode = GNVisualMode.Drive;
             vs.RotorSpeed = 180f; // thruster rotor speed
+            engineOn = true; // GN Drive is always on.
+            ECOn = true; // GN Drive generates EC through EC consumption calculation method.
+            vs.Mode = GNVisualMode.Drive;
             vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
-            engineOn = true; // GN Drive is always on.
-            ECOn = true; // GN Drive generates EC through EC consumption calculation method.
+
             ps.SyncRate = 1f;
 
             // Debug
@@ -682,7 +696,8 @@ namespace GNTechnology
             base.OnFixedUpdate();
             part.force_activate(); // Keep part activated. 
             engineOn = true; // GN Drive is always on.
-            ECOn = true;
+            ECOn = true; // Particle Generation is always on.
+            SyOn = true; // force sync
         }
 
         private void ParticleColorSwitcher()
