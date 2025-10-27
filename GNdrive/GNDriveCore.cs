@@ -51,6 +51,8 @@ namespace GNTechnology
         public float accel = 1f;
         [KSPField(guiActive = false, guiActiveEditor = false, guiName = "Input Electric Charge", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
         public bool ECOn = false;
+        [KSPField(guiActive = false, guiActiveEditor = false, guiName = "Limit Thrust at sustainable level", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
+        public bool sgOn = false;
         [KSPField(guiActive = false, guiActiveEditor = false, guiName = "Synchronize Target Drive", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
         public bool SyOn = false;
 
@@ -435,6 +437,7 @@ namespace GNTechnology
             Hide("accel");
             Hide("ES");
             Hide("SyOn");
+            Hide("sgOn");
 
             Hide("ParticleGeneration");
             Hide("ECGeneration");
@@ -590,11 +593,11 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("engineOn", "agOn", "hvOn", "accel", "SyOn", "ECOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ES");
+                PAWActivate("engineOn", "agOn", "hvOn", "accel", "SyOn", "ECOn", "sgOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ES");
             }
             else
             {
-                PAWActivate("accel", "SyOn", "ECOn", "DriveIndividuality", "ParticleGeneration");
+                PAWActivate("accel", "SyOn", "sgOn", "ECOn", "DriveIndividuality", "ParticleGeneration");
             }
 
             vs.Mode = GNVisualMode.Drive;
@@ -613,7 +616,8 @@ namespace GNTechnology
         public override void OnUpdate()
         {
             base.OnUpdate();
-            vs.ParticleColor = new Color(1f, 0f, 0.15f, 1f); // Red for condenser, To avoid override on GNBaseSystem Class.
+            vs.ParticleColor = new Color(1f, 0f, 0.15f, 1f); // Red for condenser, To avoid override on GNBaseSystem Class(DecideColor).
+            ps.SafeGuard = sgOn;
             if (hvOn && agOn)
             {
                 agOn = false;
@@ -629,7 +633,6 @@ namespace GNTechnology
         public override void OnFixedUpdate()
         {
             base.OnFixedUpdate();
-            ps.SafeGuard = ps.ECOn;
         }
 
         private void CompressIndividuality()
@@ -669,6 +672,7 @@ namespace GNTechnology
             vs.Mode = GNVisualMode.Drive;
             vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
             ps.ParticlePower = particlepower;
+            ps.SafeGuard = false; // No need for safeguard for perpetual drive.
             ps.MaxG = accel;
 
             ps.SyncRate = 1f;
@@ -681,7 +685,6 @@ namespace GNTechnology
         {
             base.OnUpdate();
             ParticleColorSwitcher();
-            ps.SafeGuard = false;
             if (part.Resources["GNparticle"].amount < 10) ps.SafeGuard = true; // just in case.
             if (hvOn && agOn)
             {

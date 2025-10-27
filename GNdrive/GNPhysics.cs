@@ -141,6 +141,7 @@ namespace GNTechnology
             {
                 // EC required for generation
                 var TD = ps.part.Resources["TopologicalDefects"];
+
                 if (ps.ECOn)
                 {
                     // GN and Tau
