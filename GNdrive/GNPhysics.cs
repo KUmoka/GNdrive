@@ -130,6 +130,9 @@ namespace GNTechnology
                 }
             }
 
+            // hv > ag, disable ag when hv > 0
+            if (hvCount > 0) ps.AgOn = false;
+
             // TRANS-AM mode adjustments
             if (ps.TaOn)
             {

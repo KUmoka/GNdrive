@@ -233,14 +233,17 @@ namespace GNTechnology
 
         private void StatusUpdate()
         {
-            if(ps.SyncRate < 0.5)
-            if (engineOn)
-            {
-                ES = "Activated";
-            }
-            else if (ps.UnSync)
+            // Sync check, make better logic here.
+            if (ps.SyncRate < 1) ps.UnSync = true;
+
+            // Engine State indicator
+            if (ps.UnSync)
             {
                 ES = "Unsynchronized";
+            }
+            else if (engineOn) 
+            {
+                ES = "Activated"; 
             }
             else
             {
