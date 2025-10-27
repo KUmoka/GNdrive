@@ -179,6 +179,7 @@ namespace GNTechnology
             if (ps.UnSync)limitFactor = 0.001f; // UnSync mode -> power almost off.Later think this to a better implementation.
             if (ps.part.Resources["GNparticle"].amount < 1)
             {
+                Debug.Log("GNparticle less than 1");
                 limitFactor = 0f; // No Particle -> power off
                 ps.EngineState = false; // also turn off engine state,
                 ps.TaOn = false; // TRANS-AM off
@@ -186,11 +187,6 @@ namespace GNTechnology
                 ps.HvOn = false; // hover off
                 return;
             }
-
-            //Debug.Log("[GN] consumption =" + consumption);
-            //Debug.Log("[GN] TotalParticlePower =" + TotalParticlePower);
-            //Debug.Log("[GN] limitFactor =" + limitFactor);
-            //Debug.Log("[GN] SafeGuard =" + ps.SafeGuard);
 
             // --- Force application ---
             foreach (Part p2 in vessel.parts)

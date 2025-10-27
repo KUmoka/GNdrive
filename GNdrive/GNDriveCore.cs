@@ -233,6 +233,7 @@ namespace GNTechnology
 
         private void StatusUpdate()
         {
+            if(ps.SyncRate < 0.)
             if (engineOn)
             {
                 ES = "Activated";
@@ -544,7 +545,7 @@ namespace GNTechnology
                 ps.AgOn = false;
                 ps.HvOn = true;
             }
-            if (engineOn = false && part.Resources["GNparticle"].amount == 0)
+            if (!engineOn && part.Resources["GNparticle"].amount == 0)
             {
                 ES = "Depleted";
             }
@@ -606,7 +607,7 @@ namespace GNTechnology
                 ps.AgOn = false;
                 ps.HvOn = true;
             }
-            if (engineOn = false && part.Resources["GNparticle"].amount == 0)
+            if (!engineOn && part.Resources["GNparticle"].amount == 0)
             {
                 ES = "Depleted";
             }
