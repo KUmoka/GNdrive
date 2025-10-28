@@ -1,4 +1,4 @@
-﻿ using GNTechnology;
+﻿using GNTechnology;
 using KSP;
 using System;
 using System.Linq;
@@ -168,13 +168,13 @@ namespace GNTechnology
 
             // Resource drain calculation
             double mass = vessel.GetTotalMass(); // KSP1.12はdouble
-            if (ps.AgOn)
-                accelMag = gee.magnitude + ThrustDirection.magnitude * actualG;  // m/s^2
-            else
-                accelMag = ThrustDirection.magnitude * actualG;                   // m/s^2
+
+            // Base Thrust, if one adds another force, one shall add like Ag/Hv
+            float support = (ps.AgOn ? gLocal : 0f) + (ps.HvOn ? aHover : 0f); // Hv, Ag accel considered here.
+            accelMag = ThrustDirection.magnitude * (actualG - support) + support;// m/s^2
 
             // consumption calculation
-            double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime;
+            double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime; //now include hover consumption.
             TotalParticlePower *= TimeWarp.fixedDeltaTime; // compensation for consumption
 
             // limit factor calculation
@@ -198,12 +198,15 @@ namespace GNTechnology
                 if (p2.physicalSignificance != Part.PhysicalSignificance.FULL || p2.rb == null)
                     continue;
 
-                // Main thrust
-                p2.AddForce(ThrustDirection * actualG * limitFactor * p2.rb.mass);
-
                 // Anti-gravity, divided by drive count
                 if (ps.AgOn && agCount > 0)
+                {
                     p2.AddForce(-gee * p2.rb.mass * limitFactor / agCount);
+                }
+                else
+                {
+                    gLocal = 0f;
+                }
 
                 // Hover処理はここに（必要なら）
                 if (ps.HvOn && aHover > 0f)
@@ -211,9 +214,16 @@ namespace GNTechnology
                     // ここで limitFactor を掛けるなら、ホバーの効きもUIで同率に制限できます
                     float forceN = aHover * p2.rb.mass * limitFactor;  // [N] = [m/s^2] * [kg]
                     p2.AddForce(upHv * forceN / hvCount);
-                    double consumptionHv = p2.rb.mass * aHover / hvCount * TimeWarp.fixedDeltaTime;
-                    ps.part.RequestResource("GNparticle", consumptionHv);
+                    //double consumptionHv = p2.rb.mass * aHover / hvCount * TimeWarp.fixedDeltaTime;
+                    //ps.part.RequestResource("GNparticle", consumptionHv);
                 }
+                else
+                {
+                    aHover = 0f;
+                }
+
+                // Main thrust
+                p2.AddForce(ThrustDirection * (actualG - aHover - gLocal) * limitFactor * p2.rb.mass);
             }
 
             // apply consumption
