@@ -214,8 +214,6 @@ namespace GNTechnology
                     // ここで limitFactor を掛けるなら、ホバーの効きもUIで同率に制限できます
                     float forceN = aHover * p2.rb.mass * limitFactor;  // [N] = [m/s^2] * [kg]
                     p2.AddForce(upHv * forceN / hvCount);
-                    //double consumptionHv = p2.rb.mass * aHover / hvCount * TimeWarp.fixedDeltaTime;
-                    //ps.part.RequestResource("GNparticle", consumptionHv);
                 }
                 else
                 {
