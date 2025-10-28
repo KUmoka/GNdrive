@@ -148,20 +148,21 @@ namespace GNTechnology
                 if (ps.ECOn)
                 {
                     // GN and Tau
-                    ECReqGen = ps.ParticleGenRate * (TD.maxAmount - 2 * TD.amount) * 0.1; // EC required proportional to lack of TD
+                    ECReqGen = ps.ParticleGenRate * (TD.maxAmount - 2 * TD.amount) * 0.1 * TimeWarp.fixedDeltaTime; // EC required proportional to lack of TD
+                    var GNGen = ps.ParticleGenRate * ps.SyncRate * TimeWarp.fixedDeltaTime;
 
                     // Tau drive
-                    if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount && TD.amount <= 0.5)
+                    if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount - GNGen && TD.amount <= 0.5)
                     {
-                        var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen * TimeWarp.fixedDeltaTime);
-                        ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * ps.SyncRate * TimeWarp.fixedDeltaTime));
+                        var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen);
+                        ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
 
                         if (Pulled <= 0.5 * TimeWarp.fixedDeltaTime) ps.ECOn = false;
                     }
                     else if(TD.amount > 0.5)// GN drive
                     {
-                        ps.part.RequestResource("ElectricCharge", ECReqGen * TimeWarp.fixedDeltaTime);
-                        ps.part.RequestResource("GNparticle", (double)(-1 * ps.ParticleGenRate * ps.SyncRate * TimeWarp.fixedDeltaTime));
+                        ps.part.RequestResource("ElectricCharge", ECReqGen);
+                        ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
                     }
                 }
             }
