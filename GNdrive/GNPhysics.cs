@@ -19,7 +19,7 @@ namespace GNTechnology
         public bool SafeGuard; // limit drive power or not to prevent dry-up.
         public float ParticlePower; // Max power of the drive can exert
         public float ParticleGenRate; // particle generation rate
-        public float MaxG; // for max accerelation
+        public float MaxG; // for max acceleration.
 
         //Twin drive parameter
         public float Individuality;
@@ -72,8 +72,8 @@ namespace GNTechnology
             float limitFactor = 1f;
             float accelMag = 0f;
             int driveCount = 0, agCount = 0, hvCount = 0, taCount = 0;
-            double ECReqGen = 0f;
-            double ecUsed = 0f;
+            // double ECReqGen = 0f;
+            // double ecUsed = 0f;
 
             // Normalize input vector
             float norm = Mathf.Sqrt(x * x + y * y + z * z);
@@ -99,6 +99,14 @@ namespace GNTechnology
             float aMax = Mathf.Max(0f, ps.MaxG * 9.80665f);// ユーザー設定上限（例：MaxG[G] → [m/s^2]へ換算）ps.MaxG が 1=1G といった意味なら：
             float aHover = ps.HvOn ? ComputeHoverAccel(vVert, gLocal, Time.fixedDeltaTime, aMax) : 0f;// ホバー用の上向き必要加速度を1回だけ計算  
 
+            // Break calculation.
+            bool brakes = vessel.ActionGroups[KSPActionGroup.Brakes];
+            Vector3 vSrf = (Vector3)vessel.srf_velocity;
+            float speed = vSrf.magnitude;
+            if (speed < 1) speed = 1f; // speed cramp
+            Vector3 brakeDir = -vSrf / speed; // unit vector until speed < 1
+
+            // Find active drives per functions.
             foreach (Part p1 in vessel.parts)
             {
                 foreach (PartModule m in p1.Modules)
@@ -130,6 +138,9 @@ namespace GNTechnology
                 }
             }
 
+            // Sync Rate Bonus, add syncrate * particlepower, instead of particlepower
+            TotalParticlePower += ps.ParticlePower * (ps.SyncRate - 1);
+
             // hv > ag, disable ag when hv > 0
             if (hvCount > 0) ps.AgOn = false;
 
@@ -137,42 +148,21 @@ namespace GNTechnology
             if (ps.TaOn)
             {
                 actualG *= 3f; //Increase actualG in TA mode
-                TotalParticlePower = TotalParticlePower + 2f * ps.ParticlePower; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
+                TotalParticlePower = TotalParticlePower + 2f * ps.ParticlePower * ps.SyncRate; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
             }
 
             // Particle Generation furnace.
-            {
-                // EC required for generation
-                var TD = ps.part.Resources["TopologicalDefects"];
-
-                if (ps.ECOn)
-                {
-                    // GN and Tau
-                    ECReqGen = ps.ParticleGenRate * (TD.maxAmount - 2 * TD.amount) * 0.1 * TimeWarp.fixedDeltaTime; // EC required proportional to lack of TD
-                    var GNGen = ps.ParticleGenRate * ps.SyncRate * TimeWarp.fixedDeltaTime;
-
-                    // Tau drive
-                    if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount - GNGen && TD.amount <= 0.5)
-                    {
-                        var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen);
-                        ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
-
-                        if (Pulled <= 0.5 * TimeWarp.fixedDeltaTime) ps.ECOn = false;
-                    }
-                    else if(TD.amount > 0.5)// GN drive
-                    {
-                        ps.part.RequestResource("ElectricCharge", ECReqGen);
-                        ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
-                    }
-                }
-            }
+            GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.fixedDeltaTime);
 
             // Resource drain calculation
             double mass = vessel.GetTotalMass(); // KSP1.12はdouble
 
             // Base Thrust, if one adds another force, one shall add like Ag/Hv
             float support = (ps.AgOn ? gLocal : 0f) + (ps.HvOn ? aHover : 0f); // Hv, Ag accel considered here.
-            accelMag = ThrustDirection.magnitude * (actualG - support) + support;// m/s^2
+            if (brakes)
+                accelMag = brakeDir.magnitude * (actualG - support) + support;// m/s^2
+            else
+                accelMag = ThrustDirection.magnitude * (actualG - support) + support;// m/s^2
 
             // consumption calculation
             double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime; //now include hover consumption.
@@ -181,7 +171,6 @@ namespace GNTechnology
             // limit factor calculation
             // 0..1想定,When particle generation on, drive power should suppress sustainable level
             if (consumption > 0 && consumption > TotalParticlePower && ps.SafeGuard) limitFactor = (float)((TotalParticlePower) / consumption);
-            if (ps.UnSync)limitFactor = 0.001f; // UnSync mode -> power almost off.Later think this to a better implementation.
             if (ps.part.Resources["GNparticle"].amount < 1)
             {
                 Debug.Log("GNparticle less than 1");
@@ -209,10 +198,9 @@ namespace GNTechnology
                     gLocal = 0f;
                 }
 
-                // Hover処理はここに（必要なら）
+                // Hover calculation.
                 if (ps.HvOn && aHover > 0f)
                 {
-                    // ここで limitFactor を掛けるなら、ホバーの効きもUIで同率に制限できます
                     float forceN = aHover * p2.rb.mass * limitFactor;  // [N] = [m/s^2] * [kg]
                     p2.AddForce(upHv * forceN / hvCount);
                 }
@@ -221,30 +209,36 @@ namespace GNTechnology
                     aHover = 0f;
                 }
 
-                // Main thrust
-                p2.AddForce(ThrustDirection * (actualG - aHover - gLocal) * limitFactor * p2.rb.mass);
+                // Main thrust or brakes
+                float ThrustBudget = Mathf.Max(0f, actualG - aHover - gLocal);
+                float BrakeMag = 1f;
+                if (speed < 1) BrakeMag = 0.05f;
+
+                if (brakes) // Brake on
+                    p2.AddForce(brakeDir * ThrustBudget * BrakeMag * limitFactor * p2.rb.mass);
+                else
+                    p2.AddForce(ThrustDirection * (ThrustBudget) * limitFactor * p2.rb.mass);
             }
 
             // apply consumption
             ps.part.RequestResource("GNparticle", consumption * limitFactor);
         }
 
-        static float _hoverLastA = 0f;      // 前回の上向き加速度 [m/s^2]（スルーレート用）
+        static float _hoverLastA = 0f;      // Previous accel rate [m/s^2]（for through rate）
         const float HoverVHard = 1.0f;      // 強ブレーキ域しきい値 |v|>=これで全力減速
         const float HoverEps = 0.001f;    // デッドバンド（これ以下なら0扱い）
         const float HoverSlewA = 30f;
 
         private static float ComputeHoverAccel(float v, float gLocal, float dt, float aMax)
         {
-
-
+            // Ask ChatGPT
             float a_cmd;
             float av = Mathf.Abs(v);
 
             if (av >= HoverVHard)
-                a_cmd = -Mathf.Sign(v) * aMax;                       // 強ブレーキ
+                a_cmd = -Mathf.Sign(v) * aMax;                       // Strong break
             else if (av > HoverEps)
-                a_cmd = Mathf.Clamp(-v / (2f * dt), -aMax, aMax);    // 半減則（次フレで速度を半分に）
+                a_cmd = Mathf.Clamp(-v / (2f * dt), -aMax, aMax);    // 1/2 (半減則（次フレで速度を半分に）)
             else
                 a_cmd = 0f;
 
@@ -261,5 +255,37 @@ namespace GNTechnology
 
             return a_total;
         }
+    }
+
+    public static class GNGenerationFurnace
+    {
+        public static void ParticleSupply(ref GNPhysicsState ps, double dt)
+        {
+            double ECReqGen = 0f;
+
+            var TD = ps.part.Resources["TopologicalDefects"];
+
+            if (ps.ECOn)
+            {
+                // GN and Tau
+                ECReqGen = ps.ParticleGenRate * (TD.maxAmount - 2 * TD.amount) * 0.1 * dt; // EC required proportional to lack of TD
+                double GNGen = ps.ParticleGenRate * ps.SyncRate * dt;
+
+                // Tau drive
+                if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount - GNGen && TD.amount <= 0.5)
+                {
+                    var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen);
+                    ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
+
+                    if (Pulled <= 0.5 * dt) ps.ECOn = false;
+                }
+                else if (TD.amount > 0.5)// GN drive
+                {
+                    ps.part.RequestResource("ElectricCharge", ECReqGen);
+                    ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
+                }
+            }
+        }
+
     }
 }

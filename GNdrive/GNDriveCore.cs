@@ -122,6 +122,7 @@ namespace GNTechnology
             if (engineOn && vs.Mode == GNVisualMode.Drive) part.force_activate(); // Keep part activated when engine is on in Drive mode.
             DecideColor();
             SyncUpdate();
+            ParticleGenerationUpdate();
         }
 
         public override void OnFixedUpdate()
@@ -193,7 +194,15 @@ namespace GNTechnology
             GNSynchronizer.SynchronizeOtherTargetDrive(OnOff, vessel, part.persistentId, ref ps);
             SetMaxG(0, 5 * ps.SyncRate);
             SynchronizeRate = ps.SyncRate;
+        }
 
+        private void ParticleGenerationUpdate()
+        {
+            if (!HighLogic.LoadedSceneIsFlight || vessel == null) 
+                return;
+
+            if (vessel.packed)
+                GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.deltaTime);
         }
 
         private void VisualUpdate()
@@ -688,7 +697,6 @@ namespace GNTechnology
         {
             base.OnUpdate();
             ParticleColorSwitcher();
-            if (part.Resources["GNparticle"].amount < 10) ps.SafeGuard = true; // just in case.
             if (hvOn && agOn)
             {
                 agOn = false;
