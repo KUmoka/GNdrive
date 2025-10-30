@@ -67,6 +67,11 @@ namespace GNTechnology
 
         public static void UpdateVisual(in GNVisualState vs)
         {
+            Vessel vessel = vs.part.vessel;
+            bool brakes = vessel.ActionGroups[KSPActionGroup.Brakes];
+            Vector3 vSrf = (Vector3)vessel.srf_velocity;
+            float speed = vSrf.magnitude;
+
             // NRE avoidance
             if (vs.part == null)
             { 
@@ -82,6 +87,9 @@ namespace GNTechnology
 
             // Engine:On => update visual effects
             float level = GetLevel(vs);
+
+            // if brake, less particle emission and light
+            if (brakes && speed < 0.05 && vs.Mode == GNVisualMode.Drive) level = 0.1f;
 
             UpdateRotor(vs.Rotors, vs.RotorSpeed,level);
             UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level);

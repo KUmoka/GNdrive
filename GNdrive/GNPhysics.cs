@@ -212,7 +212,7 @@ namespace GNTechnology
                 // Main thrust or brakes
                 float ThrustBudget = Mathf.Max(0f, actualG - aHover - gLocal);
                 float BrakeMag = 1f;
-                if (speed < 1) BrakeMag = 0.05f;
+                if (speed < 0.2) BrakeMag = 0.05f;
 
                 if (brakes) // Brake on
                     p2.AddForce(brakeDir * ThrustBudget * BrakeMag * limitFactor * p2.rb.mass);
