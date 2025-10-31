@@ -6,12 +6,14 @@ using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using static GNTechnology.GNSynchronizer;
 
 namespace GNTechnology
 {
+    public enum DriveState {Unsynchronized, Depleted, Activated, Deactivated, Refilled}
     public class GNBaseSystem : PartModule // Pure condenser, Effect control system implemented here.
     {
         // variables for visual, physics states.
@@ -58,7 +60,7 @@ namespace GNTechnology
 
         // KSP field for indicate states
         [KSPField(guiName = "Engine Status", guiActive = false, guiActiveEditor = false, isPersistant = true)]
-        public string ES = "Deactivated";
+        public string ES = DriveState.Deactivated.ToString();
 
         // KSP field for Particle/EC Generation rate (Condenser = 0)
         [KSPField(guiName = "Particle Generation", guiActive = true, guiActiveEditor = true, isPersistant = true)]
@@ -119,7 +121,6 @@ namespace GNTechnology
             VisualUpdate();
             StatusUpdate();
             UpdateDriveAudio(engineOn);// Update audio based on engine state.
-            if (engineOn && vs.Mode == GNVisualMode.Drive) part.force_activate(); // Keep part activated when engine is on in Drive mode.
             DecideColor();
             SyncUpdate();
             ParticleGenerationUpdate();
@@ -214,11 +215,26 @@ namespace GNTechnology
 
         private void PhysicsUpdate()
         {
-            if (!engineOn || vessel == null || vessel.packed) // only update physics when engine is on and vessel is unpacked
+            // only update physics when engine is on and vessel is unpacked
+            if (!engineOn || vessel == null || vessel.packed) 
             {
                 return;
             }
 
+            // Refilled is ready for active.
+            if (ES != DriveState.Activated.ToString())
+            {
+                if (ES != DriveState.Refilled.ToString())
+                    engineOn = false;
+                return;
+            }
+
+            // Do update.
+            PhysicsUpdateSupport();
+        }
+
+        private void PhysicsUpdateSupport()
+        {
             ps.EngineState = engineOn;
             ps.AgOn = agOn;
             ps.TaOn = taOn;
@@ -248,15 +264,23 @@ namespace GNTechnology
             // Engine State indicator
             if (ps.UnSync)
             {
-                ES = "Unsynchronized";
+                ES = DriveState.Unsynchronized.ToString();
+                return;
             }
-            else if (engineOn) 
+            
+            if (ES == DriveState.Depleted.ToString())
             {
-                ES = "Activated"; 
+                ES = DriveState.Depleted.ToString();
+                return;
             }
-            else
+
+            if (engineOn)
             {
-                ES = "Deactivated";
+                ES = DriveState.Activated.ToString();
+            }
+            else if(!engineOn && ES != DriveState.Refilled.ToString())
+            {
+                ES = DriveState.Deactivated.ToString();
             }
         }
 
@@ -576,7 +600,7 @@ namespace GNTechnology
             }
             if (!engineOn && part.Resources["GNparticle"].amount == 0)
             {
-                ES = "Depleted";
+                ES = DriveState.Depleted.ToString();
             }
         }
 
@@ -591,6 +615,8 @@ namespace GNTechnology
     {
         [KSPField(guiName = "Max Particle Output", guiActive = true)]
         public float particlepower = 1200f;
+
+        private bool Dep;
 
         public override void OnStart(StartState state)
         {
@@ -636,15 +662,28 @@ namespace GNTechnology
                 ps.AgOn = false;
                 ps.HvOn = true;
             }
-            if (!engineOn && part.Resources["GNparticle"].amount == 0)
+
+            Dep = EngineDepleted();
+            if (Dep) ps.EngineState = false;
+            if (part.Resources["GNparticle"].amount < 1)
             {
-                ES = "Depleted";
+                ES = DriveState.Depleted.ToString();
+            }
+            else if (part.Resources["GNparticle"].amount == part.Resources["GNparticle"].maxAmount && ES == DriveState.Depleted.ToString())
+            {
+                ES = DriveState.Refilled.ToString();// now enable engine On.
             }
         }
 
         public override void OnFixedUpdate()
         {
             base.OnFixedUpdate();
+        }
+
+        private bool EngineDepleted()
+        {
+            if (ES == "Depleted" && part.Resources["GNparticle"].amount < part.Resources["GNparticle"].maxAmount) return true;
+            return false;
         }
 
         private void CompressIndividuality()
@@ -708,10 +747,19 @@ namespace GNTechnology
         public override void OnFixedUpdate()
         {
             base.OnFixedUpdate();
-            part.force_activate(); // Keep part activated. 
-            engineOn = true; // GN Drive is always on.
-            ECOn = true; // Particle Generation is always on.
             SyOn = true; // force sync
+
+            // GN drive needs TD for actual work.
+            if (part.Resources["GNparticle"].amount > 0 || part.Resources["TopologicalDefects"].amount >= 0.5)
+            {
+                engineOn = true; // GN Drive is always on.
+                part.force_activate(); // Keep part activated. 
+                ECOn = true; // Particle Generation is always on when there are enough TD.
+            }
+            else
+            {
+                engineOn = false; // GN Drive power down.
+            }
         }
 
         private void ParticleColorSwitcher()

@@ -55,6 +55,7 @@ namespace GNTechnology
         {
             // --- Basic NRE prevention ---
             if (ps.part == null) return;
+            if (!ps.EngineState) return;// Engine Off
             var vessel = ps.part.vessel;
             if (vessel == null) return;
             if (!HighLogic.LoadedSceneIsFlight) return; //  || !vessel.isActiveVessel 
@@ -261,10 +262,12 @@ namespace GNTechnology
     {
         public static void ParticleSupply(ref GNPhysicsState ps, double dt)
         {
+            // variables
             double ECReqGen = 0f;
-
             var TD = ps.part.Resources["TopologicalDefects"];
+            double actualAdd = 0f;
 
+            // EC->GNP logic
             if (ps.ECOn)
             {
                 // GN and Tau
@@ -272,20 +275,32 @@ namespace GNTechnology
                 double GNGen = ps.ParticleGenRate * ps.SyncRate * dt;
 
                 // Tau drive
-                if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount - GNGen && TD.amount <= 0.5)
-                {
-                    var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen);
-                    ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
+                //if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount - GNGen && TD.amount <= 0.5)
+                actualAdd = ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
 
-                    if (Pulled <= 0.5 * dt) ps.ECOn = false;
+                // GNGen > 0, actualAdd < 0
+                if (actualAdd < 0 && TD.amount <= 0.5)
+                {
+                    // EC draw
+                    var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen * (actualAdd / (-1 * GNGen)));
+                    //Debug.Log(ECReqGen * (actualAdd / GNGen));
+
+                    // Enough EC or not?
+                    if (Pulled <= 0.5 * dt)
+                    {
+                        ps.ECOn = false;
+                        return;
+                    } 
+
+                    // EC -> GNP reaction.
+                    // ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
                 }
-                else if (TD.amount > 0.5)// GN drive
+                else if (TD.amount > 0.5)// GN drive or GN drive Tau with TD
                 {
                     ps.part.RequestResource("ElectricCharge", ECReqGen);
                     ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
                 }
             }
         }
-
     }
 }
