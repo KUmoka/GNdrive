@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace GNTechnology
 {
-    public enum GNVisualMode {Condenser, Drive}//When Condenser mode, no particle emission from the parts.
+    public enum GNVisualMode {Condenser, Drive, CondenserDrive}//When Condenser mode, no particle emission from the parts.
         
     public struct GNVisualState
     {

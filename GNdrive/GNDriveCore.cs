@@ -598,9 +598,9 @@ namespace GNTechnology
                 ps.AgOn = false;
                 ps.HvOn = true;
             }
-            if (!engineOn && part.Resources["GNparticle"].amount == 0)
+            if (engineOn && part.Resources["GNparticle"].amount < 0)
             {
-                ES = DriveState.Depleted.ToString();
+                engineOn = false;
             }
         }
 
