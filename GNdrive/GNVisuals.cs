@@ -65,6 +65,16 @@ namespace GNTechnology
             }
         }
 
+        private static void RotorOff(in GNVisualState vs, float level)
+        {
+            // part is null=> do nothing
+            if (vs.part == null) return;
+
+            UpdateRotor(vs.Rotors, 0f, 0f); // no rotation
+            UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level); // Condenser glow
+            UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, 0f); // no particle emission
+        }
+
         public static void UpdateVisual(in GNVisualState vs)
         {
             Vessel vessel = vs.part.vessel;
@@ -78,22 +88,37 @@ namespace GNTechnology
                 return; 
             }
 
-            // Engine off => stop all visual effects
-            if (!vs.EngineState && vs.Mode == GNVisualMode.Drive)
-            {
-                SetOff(vs);
-                return;
-            }
-
             // Engine:On => update visual effects
             float level = GetLevel(vs);
 
-            // if brake, less particle emission and light
-            if (brakes && speed < 0.05 && vs.Mode == GNVisualMode.Drive) level = 0.1f;
+            // Engine off => stop visual effects of drives
+            if (!vs.EngineState && vs.Mode != GNVisualMode.Condenser)
+            {
+                if (vs.Mode == GNVisualMode.Drive) SetOff(vs);
+                if (vs.Mode == GNVisualMode.CondenserDrive) RotorOff(vs, level);
+                return;
+            }
 
-            UpdateRotor(vs.Rotors, vs.RotorSpeed,level);
-            UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level);
-            if (vs.Mode == GNVisualMode.Drive) UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, level);   
+            // GNCondenserDrive, or else.
+            if (vs.Mode == GNVisualMode.CondenserDrive)
+            {
+                var lv = Mathf.Lerp(0.1f, 1f, Mathf.Clamp01(vs.InputLevel));
+
+                // if brake, less particle emission and light.
+                if (brakes && speed < 0.05) lv = 0.1f;
+
+                UpdateRotor(vs.Rotors, vs.RotorSpeed, lv);
+                UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level);
+                UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, lv);
+            }
+            else
+            {
+                // if brake, less particle emission and light.
+                if (brakes && speed < 0.05 && (vs.Mode == GNVisualMode.Drive)) level = 0.1f;
+                UpdateRotor(vs.Rotors, vs.RotorSpeed, level); // usual
+                UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level);
+                if (vs.Mode != GNVisualMode.Condenser) UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, level);
+            }
         }
 
         private static float GetLevel(in GNVisualState vs) // set emission, rotation and particle emission level

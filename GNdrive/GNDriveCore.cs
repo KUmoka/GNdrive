@@ -104,6 +104,8 @@ namespace GNTechnology
         {
             // Check if loaded in editor
             base.OnStart(state);
+
+
             Debug.Log("[GN] GN_Base_System OnStart called.");
             VisualInit();
             PhysicsInit();
@@ -113,6 +115,8 @@ namespace GNTechnology
 
             // System Initialize
             SystemInit();
+
+            Debug.Log("[GN] SystemInit Completed.");
         }
 
         public override void OnUpdate()
@@ -579,7 +583,7 @@ namespace GNTechnology
                 PAWActivate("accel");
             }
 
-            vs.Mode = GNVisualMode.Drive;
+            vs.Mode = GNVisualMode.CondenserDrive;
             vs.RotorSpeed = 180f; // thruster rotor speed
             vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
             ps.ParticlePower = particlepower;

@@ -68,14 +68,10 @@
     <Compile Include="GNMechanics.cs" />
     <Compile Include="GNPhysics.cs" />
     <Compile Include="GNshield.cs" />
-    <Compile Include="GNcap.cs" />
-    <Compile Include="GNdriveTau.cs" />
-    <Compile Include="GNdrive.cs" />
     <Compile Include="GNsword.cs" />
     <Compile Include="GNVisuals.cs" />
     <Compile Include="PID.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="StarWarEngine.cs" />
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />

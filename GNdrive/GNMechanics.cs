@@ -11,6 +11,8 @@ namespace GNTechnology
         {
             public int TauCount;
             public int GNCount;
+            public int CDCount;
+            public int TCount;
             public Color SumColor;   // 0..1にクランプ済み
             public Color AvgColor;   // 同上（寄与した個体で平均）
         }
@@ -44,6 +46,22 @@ namespace GNTechnology
                     r.GNCount++;
                     Accumulate(ref sum, ref weightSum, m.vs);
                 }
+
+                // CondenserDrive
+                var cd = p.FindModulesImplementing<GNCondenserDriveSystem>();
+                foreach (var m in cd)
+                {
+                    r.CDCount++;
+                    Accumulate(ref sum, ref weightSum, m.vs);
+                }
+
+                // GNThruster
+                var GNThruster = p.FindModulesImplementing<GNThrusterSystem>();
+                foreach (var m in GNThruster)
+                {
+                    r.TCount++;
+                    Accumulate(ref sum, ref weightSum, m.vs);
+                }
             }
 
             // 合算は0..1にクランプ、平均は寄与ウェイトで正規化
@@ -56,7 +74,7 @@ namespace GNTechnology
         private static void Accumulate(ref Color sum, ref float wsum, in GNVisualState vs)
         {
             //if (!vs.EngineState) return; Condenser should accumulate particles, so not related with Engine State.
-            if (vs.Mode != GNVisualMode.Drive) return; // コンデンサ側のvsは無視
+            if (vs.Mode == GNVisualMode.Condenser) return; // コンデンサ側のvsは無視
 
             // 0..1に収まる重み（好みでガンマ補正してもOK）
             //float w = 1 //Mathf.Clamp01(vs.InputLevel); Condenser color shouldn't reflects main thrust
