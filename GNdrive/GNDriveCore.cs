@@ -58,6 +58,10 @@ namespace GNTechnology
         [KSPField(guiActive = false, guiActiveEditor = false, guiName = "Synchronize Target Drive", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
         public bool SyOn = false;
 
+        // KSP field for OriginalMaxG
+        [KSPField(guiName = "Maximum Acceleration", guiActive = false, guiActiveEditor = true, isPersistant = true)]
+        public float MaxAccel = 0f;
+
         // KSP field for indicate states
         [KSPField(guiName = "Engine Status", guiActive = false, guiActiveEditor = false, isPersistant = true)]
         public string ES = DriveState.Deactivated.ToString();
@@ -179,7 +183,7 @@ namespace GNTechnology
             if (!SyOn)
             {
                 ps.SyncRate = 1f;
-                SetMaxG(0, 5 * ps.SyncRate);
+                SetMaxG(0, MaxAccel * ps.SyncRate);
                 return;
             } 
 
@@ -197,7 +201,7 @@ namespace GNTechnology
             if (OnOff == current) return;
             else OnOff = current;
             GNSynchronizer.SynchronizeOtherTargetDrive(OnOff, vessel, part.persistentId, ref ps);
-            SetMaxG(0, 5 * ps.SyncRate);
+            SetMaxG(0, MaxAccel * ps.SyncRate);
             SynchronizeRate = ps.SyncRate;
         }
 
@@ -528,7 +532,7 @@ namespace GNTechnology
             base.OnStart(state);
 
             // set accel
-            SetMaxG(0f, 2f);
+            SetMaxG(0f, MaxAccel);
 
             part.stagingIcon = "LIQUID_ENGINE";
             part.stagingIconAlwaysShown = true;
@@ -568,7 +572,7 @@ namespace GNTechnology
             base.OnStart(state);
 
             //Set accel
-            SetMaxG(0f, 4f);
+            SetMaxG(0f, MaxAccel);
 
             part.stagingIcon = "LIQUID_ENGINE";
             part.stagingIconAlwaysShown = true;
@@ -627,7 +631,7 @@ namespace GNTechnology
             base.OnStart(state);
 
             // set accel
-            SetMaxG(0f, 5f);
+            SetMaxG(0f, MaxAccel);
 
             part.stagingIcon = "LIQUID_ENGINE";
             part.stagingIconAlwaysShown = true;
@@ -706,7 +710,7 @@ namespace GNTechnology
             base.OnStart(state);
 
             // set accel
-            SetMaxG(0f, 5f);
+            SetMaxG(0f, MaxAccel);
 
             part.stagingIcon = "LIQUID_ENGINE";
             part.stagingIconAlwaysShown = true;
