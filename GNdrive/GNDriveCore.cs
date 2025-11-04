@@ -3,6 +3,7 @@ using KSP;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Reflection.Emit;
@@ -10,10 +11,30 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using static GNTechnology.GNSynchronizer;
+using static VehiclePhysics.ProjectPatchAsset;
 
 namespace GNTechnology
 {
-    public enum DriveState {Unsynchronized, Depleted, Activated, Deactivated, Refilled}
+    //public enum DriveState {Unsynchronized, Depleted, Activated, Deactivated, Refilled}
+
+    public enum DriveState
+    {
+        [Description("⚠ Unsync!")]
+        Unsynchronized,
+
+        [Description("⛽ Depleted")]
+        Depleted,
+
+        [Description("🔥 Activated")]
+        Activated,
+
+        [Description("⛔ Deactivated")]
+        Deactivated,
+
+        [Description("🔋 Refilled")]
+        Refilled
+    }
+
     public class GNBaseSystem : PartModule // Pure condenser, Effect control system implemented here.
     {
         // variables for visual, physics states.
@@ -63,8 +84,10 @@ namespace GNTechnology
         public float MaxAccel = 0f;
 
         // KSP field for indicate states
-        [KSPField(guiName = "Engine Status", guiActive = false, guiActiveEditor = false, isPersistant = true)]
-        public string ES = DriveState.Deactivated.ToString();
+        [KSPField(guiName = "ESinternal", guiActive = false, guiActiveEditor = false, isPersistant = true)]
+        public DriveState ES = DriveState.Deactivated;
+        [KSPField(guiName = "Engine Status", guiActive = false, guiActiveEditor = false)]
+        public string ESDisplay = "None";
 
         // KSP field for Particle/EC Generation rate (Condenser = 0)
         [KSPField(guiName = "Particle Generation", guiActive = true, guiActiveEditor = true, isPersistant = true)]
@@ -132,6 +155,7 @@ namespace GNTechnology
             DecideColor();
             SyncUpdate();
             ParticleGenerationUpdate();
+            ESDisplayUpdate(); // update Engine State display
         }
 
         public override void OnFixedUpdate()
@@ -230,15 +254,20 @@ namespace GNTechnology
             }
 
             // Refilled is ready for active.
-            if (ES != DriveState.Activated.ToString())
+            switch (ES)
             {
-                if (ES != DriveState.Refilled.ToString())
-                    engineOn = false;
-                return;
-            }
+                case DriveState.Unsynchronized:
+                case DriveState.Activated:
+                    PhysicsUpdateSupport();
+                    break;
 
-            // Do update.
-            PhysicsUpdateSupport();
+                case DriveState.Depleted:
+                    engineOn = false;
+                    break;
+
+                default:
+                    break;
+            }
         }
 
         private void PhysicsUpdateSupport()
@@ -272,23 +301,25 @@ namespace GNTechnology
             // Engine State indicator
             if (ps.UnSync)
             {
-                ES = DriveState.Unsynchronized.ToString();
+                ES = DriveState.Unsynchronized;
                 return;
             }
             
-            if (ES == DriveState.Depleted.ToString())
+            // case Depleted.
+            if (ES == DriveState.Depleted)
             {
-                ES = DriveState.Depleted.ToString();
+                ES = DriveState.Depleted;
                 return;
             }
 
+            // case Engine on by user
             if (engineOn)
             {
-                ES = DriveState.Activated.ToString();
+                ES = DriveState.Activated;
             }
-            else if(!engineOn && ES != DriveState.Refilled.ToString())
+            else if(!engineOn && ES != DriveState.Refilled)
             {
-                ES = DriveState.Deactivated.ToString();
+                ES = DriveState.Deactivated;
             }
         }
 
@@ -515,10 +546,29 @@ namespace GNTechnology
 
         protected void SetMaxG(float min, float max)
         {
-            UI_FloatRange range = (UI_FloatRange)Fields["accel"].uiControlFlight;
-            range.minValue = min;
-            range.maxValue = max;
-            AccelDiv = range.maxValue;
+            // accel field is for drive Control
+            ApplyRange(Fields["accel"], min, max, 0.1f);
+            AccelDiv = max;
+        }
+
+        private void ApplyRange(BaseField f, float min, float max, float step)
+        {
+            var e = f.uiControlEditor as UI_FloatRange;
+            var fl = f.uiControlFlight as UI_FloatRange;
+
+            if (e != null) { e.minValue = min; e.maxValue = max; e.stepIncrement = step; }
+            if (fl != null) { fl.minValue = min; fl.maxValue = max; fl.stepIncrement = step; }
+        }
+
+        protected void ESDisplayUpdate()
+        {
+            //var desc = typeof(DriveState)
+            //    .GetField(ES.ToString())
+            //    .GetCustomAttributes(typeof(DescriptionAttribute), false)
+            //    .FirstOrDefault() as DescriptionAttribute;
+
+            //ESDisplay = desc?.Description ?? ES.ToString();
+            ESDisplay = ES.ToString();
         }
     }
 
@@ -540,7 +590,7 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("engineOn", "accel", "ES");
+                PAWActivate("engineOn", "accel", "ESDisplay");
             }
             else
             {
@@ -580,7 +630,7 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("engineOn", "agOn", "hvOn", "accel", "ES");
+                PAWActivate("engineOn", "agOn", "hvOn", "accel", "ESDisplay");
             }
             else
             {
@@ -639,7 +689,7 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("engineOn", "agOn", "hvOn", "accel", "SyOn", "ECOn", "sgOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ES");
+                PAWActivate("engineOn", "agOn", "hvOn", "accel", "SyOn", "ECOn", "sgOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay");
             }
             else
             {
@@ -675,11 +725,11 @@ namespace GNTechnology
             if (Dep) ps.EngineState = false;
             if (part.Resources["GNparticle"].amount < 1)
             {
-                ES = DriveState.Depleted.ToString();
+                ES = DriveState.Depleted;
             }
-            else if (part.Resources["GNparticle"].amount == part.Resources["GNparticle"].maxAmount && ES == DriveState.Depleted.ToString())
+            else if (part.Resources["GNparticle"].amount == part.Resources["GNparticle"].maxAmount && ES == DriveState.Depleted)
             {
-                ES = DriveState.Refilled.ToString();// now enable engine On.
+                ES = DriveState.Refilled;// now enable engine On.
             }
         }
 
@@ -690,7 +740,7 @@ namespace GNTechnology
 
         private bool EngineDepleted()
         {
-            if (ES == "Depleted" && part.Resources["GNparticle"].amount < part.Resources["GNparticle"].maxAmount) return true;
+            if (ES == DriveState.Depleted && part.Resources["GNparticle"].amount < part.Resources["GNparticle"].maxAmount) return true;
             return false;
         }
 
@@ -718,7 +768,7 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("agOn", "hvOn","taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ES"); // Always on Engine, Cannot turn off.
+                PAWActivate("agOn", "hvOn","taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay"); // Always on Engine, Cannot turn off.
             }
             else
             {

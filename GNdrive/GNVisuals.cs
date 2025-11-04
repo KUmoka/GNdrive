@@ -1,6 +1,7 @@
 ﻿using KSP;
 using System;
 using UnityEngine;
+using static iT;
 
 namespace GNTechnology
 {
@@ -197,9 +198,80 @@ namespace GNTechnology
                 e.maxEmission = (int)Mathf.Lerp(e.maxEmission, tMax, 10f);
                 e.localVelocity = new Vector3(0f, -1 * Mathf.Lerp(5f, 45f, level), 0f);
 
-                //Future update will change particle color.
-                //now particle color is depends on the model.
+                // particle coloring system
+                SetEmitterColor_PS(e, particleColor);
+                //DumpEmitter(e, "GN");
             }
+        }
+
+        private static bool ApproximatelyRGB(Color a, Color b, float eps = 1e-3f) => Mathf.Abs(a.r - b.r) < eps && Mathf.Abs(a.g - b.g) < eps && Mathf.Abs(a.b - b.b) < eps;
+        private static readonly int TintId = Shader.PropertyToID("_TintColor");
+        private static readonly int ColorId = Shader.PropertyToID("_Color");
+
+        private static void SetEmitterColor_PS(KSPParticleEmitter e, Color c)
+        {
+            if (!e) return; // prevents NRE
+
+            var ps = e.GetComponent<ParticleSystem>();
+            if (ps == null) return; // no particle system -> return
+
+            // 既存色と同じならスキップ（startColor優先でチェック）
+            var main = ps.main;
+            Color current = Color.magenta;
+            switch (main.startColor.mode)
+            {
+                case ParticleSystemGradientMode.Color: current = main.startColor.color; break;
+                case ParticleSystemGradientMode.TwoColors: current = main.startColor.colorMax; break;
+                case ParticleSystemGradientMode.Gradient:
+                case ParticleSystemGradientMode.TwoGradients:
+                    // gradientが有効なら最初のcolorKeyから推定
+                    var col = ps.colorOverLifetime;
+                    if (col.enabled && col.color.mode == ParticleSystemGradientMode.Gradient)
+                    {
+                        var g = col.color.gradient;
+                        if (g.colorKeys != null && g.colorKeys.Length > 0) current = g.colorKeys[0].color;
+                    }
+                    break;
+            }
+            if (ApproximatelyRGB(current, c)) return;
+
+            // レンダラのTintは白(α=1)にして乗算の影響を除去
+            var psr = ps.GetComponent<ParticleSystemRenderer>();
+            if (psr && psr.sharedMaterial)
+            {
+                var m = psr.sharedMaterial;
+                if (m.HasProperty(TintId)) m.SetColor(TintId, Color.white);
+                if (m.HasProperty(ColorId)) m.SetColor(ColorId, Color.white);
+            }
+
+            // αは e.colorAnimation の [0],[2],[4] を使う（無ければデフォルト）
+            float a0 = 1f, a2 = 0.35f, a4 = 0.02f;
+            var keys = e.colorAnimation; // Color[5]
+            if (keys != null && keys.Length >= 5) { a0 = keys[0].a; a2 = keys[2].a; a4 = keys[4].a; }
+
+            // startColor（出生色）と、Color Over Lifetime（全期間の色）を設定
+            main.startColor = new ParticleSystem.MinMaxGradient(c); // new Color(c.r, c.g, c.b, 1f));
+
+            var colOL = ps.colorOverLifetime;
+            colOL.enabled = true;
+
+            var g2 = new Gradient();
+            g2.SetKeys(new[]{new GradientColorKey(new Color(c.r,c.g,c.b), 0f), new GradientColorKey(new Color(c.r,c.g,c.b), 1f)}, new[]{new GradientAlphaKey(a0, 0f), new GradientAlphaKey(a2, 0.5f), new GradientAlphaKey(a4, 1f)});
+            colOL.color = new ParticleSystem.MinMaxGradient(g2);
+        }
+
+        // for debug.
+        private static void DumpEmitter(KSPParticleEmitter e, string tag = "")
+        {
+            var r = e.GetComponent<Renderer>();
+            var mat = r ? r.sharedMaterial : null;
+            var tint = mat && mat.HasProperty("_TintColor") ? mat.GetColor("_TintColor") :
+                       mat && mat.HasProperty("_Color") ? mat.GetColor("_Color") : Color.magenta;
+
+            Debug.Log($"[GN] {tag} emit={e.emit} doesAnim={(e ? e.doesAnimateColor : false)} " +
+                      $"tint={tint} tex={mat?.mainTexture?.name} shader={mat?.shader?.name} " +
+                      $"c0={e.colorAnimation[0]} c2={e.colorAnimation[2]} c4={e.colorAnimation[4]} " +
+                      $"hasPS={(e.GetComponent<ParticleSystem>() != null)}");
         }
     }
 }
