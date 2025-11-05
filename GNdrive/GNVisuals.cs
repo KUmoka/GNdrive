@@ -236,15 +236,6 @@ namespace GNTechnology
             }
             if (ApproximatelyRGB(current, c)) return;
 
-            // レンダラのTintは白(α=1)にして乗算の影響を除去
-            var psr = ps.GetComponent<ParticleSystemRenderer>();
-            if (psr && psr.sharedMaterial)
-            {
-                var m = psr.sharedMaterial;
-                if (m.HasProperty(TintId)) m.SetColor(TintId, Color.white);
-                if (m.HasProperty(ColorId)) m.SetColor(ColorId, Color.white);
-            }
-
             // αは e.colorAnimation の [0],[2],[4] を使う（無ければデフォルト）
             float a0 = 1f, a2 = 0.35f, a4 = 0.02f;
             var keys = e.colorAnimation; // Color[5]
