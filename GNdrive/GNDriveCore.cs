@@ -535,6 +535,15 @@ namespace GNTechnology
             }
         }
 
+        protected void PAWDeactivate(params string[] fieldNames)
+        {
+            foreach (var name in fieldNames)
+            {
+                Fields[name].guiActive = false;
+                Fields[name].guiActiveEditor = false;
+            }
+        }
+
         protected float InputLevel()
         {
             X = Mathf.Abs(vessel.ctrlState.X);
@@ -689,7 +698,16 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("engineOn", "agOn", "hvOn", "accel", "SyOn", "ECOn", "sgOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay");
+                PAWActivate("agOn", "hvOn", "accel", "SyOn", "ECOn", "sgOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay");
+                if (part.Resources["TopologicalDefects"].amount < 0.5)
+                {
+                    PAWActivate("engineOn");
+                }
+                else
+                {
+                    engineOn = true;
+                    ECOn = true;
+                }
             }
             else
             {
@@ -698,7 +716,7 @@ namespace GNTechnology
 
             vs.Mode = GNVisualMode.Drive;
             vs.RotorSpeed = 180f; // thruster rotor speed
-            vs.ParticleColor = new Color(1f, 0f, 0.15f, 1f); // Red for condenser.
+            vs.ParticleColor = ParticleColor(); // Red for condenser.
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
 
@@ -712,13 +730,21 @@ namespace GNTechnology
         public override void OnUpdate()
         {
             base.OnUpdate();
-            vs.ParticleColor = new Color(1f, 0f, 0.15f, 1f); // Red for condenser, To avoid override on GNBaseSystem Class(DecideColor).
+            vs.ParticleColor = ParticleColor(); // Red for condenser, To avoid override on GNBaseSystem Class(DecideColor).
             ps.SafeGuard = sgOn;
             if (hvOn && agOn)
             {
                 agOn = false;
                 ps.AgOn = false;
                 ps.HvOn = true;
+            }
+
+            // TD enables perpetual drive.
+            if (part.Resources["TopologicalDefects"].amount >= 0.5)
+            {
+                engineOn = true;
+                ECOn = true;
+                return; // engine won't stop
             }
 
             Dep = EngineDepleted();
@@ -747,6 +773,23 @@ namespace GNTechnology
         private void CompressIndividuality()
         {
             DriveIndividuality *= 0.5f;
+        }
+
+        private Color ParticleColor()
+        {
+            // NPE check
+            float TDmax = (float)part.Resources["TopologicalDefects"].maxAmount;
+
+            // NPE avoid
+            if (TDmax == 0) return new Color(1f, 0f, 0.15f, 1f);
+
+            float TDnow = (float)part.Resources["TopologicalDefects"].amount;
+            float r = 1f - TDnow / TDmax;
+            float g = TDnow / TDmax;
+            float b = (40f * (1 - g) + 170f * g) / 255f;
+
+            // intermix
+            return new Color(r, g, b, 1f); // Red for condenser.
         }
     }
 

@@ -260,6 +260,8 @@ namespace GNTechnology
 
     public static class GNGenerationFurnace
     {
+        private static double difficulty = 0.1f;
+
         public static void ParticleSupply(ref GNPhysicsState ps, double dt)
         {
             // variables
@@ -271,7 +273,7 @@ namespace GNTechnology
             if (ps.ECOn)
             {
                 // GN and Tau
-                ECReqGen = ps.ParticleGenRate * (TD.maxAmount - 2 * TD.amount) * 0.1 * dt; // EC required proportional to lack of TD
+                ECReqGen = ps.ParticleGenRate * (TD.maxAmount - 2 * TD.amount) * difficulty * dt; // EC required proportional to lack of TD
                 double GNGen = ps.ParticleGenRate * ps.SyncRate * dt;
 
                 // Tau drive
