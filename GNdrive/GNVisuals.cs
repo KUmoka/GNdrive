@@ -174,6 +174,7 @@ namespace GNTechnology
                 {
                     var l = lights[i];
                     if (!l) continue;
+                    l.range = level;
                     l.color = glow;
                     l.intensity = baseIntensity * level;
                 }
