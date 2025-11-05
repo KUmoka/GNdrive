@@ -151,7 +151,7 @@ namespace GNTechnology
             // variables
             List<float> deviationTau = new List<float>();
             List<float> deviation = new List<float>();
-            bool myDriveIsTau = false;
+            bool myDriveIsTau = false; // only 1 drive for parts allowed.
 
             // parts find
             foreach (var p in vessel.parts)

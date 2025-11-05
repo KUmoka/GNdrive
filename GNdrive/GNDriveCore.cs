@@ -256,8 +256,8 @@ namespace GNTechnology
             // Refilled is ready for active.
             switch (ES)
             {
-                case DriveState.Unsynchronized:
-                case DriveState.Activated:
+                case DriveState.Unsynchronized:// drive works at low level
+                case DriveState.Activated: // drive functioning
                     PhysicsUpdateSupport();
                     break;
 
@@ -296,7 +296,8 @@ namespace GNTechnology
         private void StatusUpdate()
         {
             // Sync check, make better logic here.
-            if (ps.SyncRate < 1) ps.UnSync = true;
+            // if (ps.SyncRate < 1) ps.UnSync = true; old llogic
+            ps.UnSync = ps.SyncRate < 1f; // right true => left true.
 
             // Engine State indicator
             if (ps.UnSync)
@@ -409,7 +410,8 @@ namespace GNTechnology
             var allR = part.transform.GetComponentsInChildren<Renderer>(true);
             foreach (var r in allR)
             {
-                if (r.name.Contains("rotor") || r.name.Contains("stator") && r.GetComponentInParent<Part>() == this.part)
+                // if (r.name.Contains("rotor") || r.name.Contains("stator") && r.GetComponentInParent<Part>() == this.part)
+                if ((r.name.Contains("rotor") || r.name.Contains("stator")) && r.GetComponentInParent<Part>() == this.part)
                     listR.Add(r);
             }
 
@@ -530,8 +532,12 @@ namespace GNTechnology
         {
             foreach (var name in fieldNames)
             {
-                Fields[name].guiActive = true;
-                Fields[name].guiActiveEditor = true;
+                var f = Fields[name];
+                if (f != null)
+                {
+                    Fields[name].guiActive = true;
+                    Fields[name].guiActiveEditor = true;
+                }
             }
         }
 
@@ -539,8 +545,12 @@ namespace GNTechnology
         {
             foreach (var name in fieldNames)
             {
-                Fields[name].guiActive = false;
-                Fields[name].guiActiveEditor = false;
+                var f = Fields[name];
+                if (f != null)
+                {
+                    Fields[name].guiActive = false;
+                    Fields[name].guiActiveEditor = false;
+                }
             }
         }
 
@@ -557,6 +567,7 @@ namespace GNTechnology
         {
             // accel field is for drive Control
             ApplyRange(Fields["accel"], min, max, 0.1f);
+            accel = Mathf.Clamp(accel, min, max);
             AccelDiv = max;
         }
 
@@ -565,7 +576,7 @@ namespace GNTechnology
             var e = f.uiControlEditor as UI_FloatRange;
             var fl = f.uiControlFlight as UI_FloatRange;
 
-            if (e != null) { e.minValue = min; e.maxValue = max; e.stepIncrement = step; }
+            if (e != null) { e.minValue = min; e.maxValue = max; e.stepIncrement = step; }if (ps.SyncRate < 1) ps.UnSync = true;
             if (fl != null) { fl.minValue = min; fl.maxValue = max; fl.stepIncrement = step; }
         }
 
@@ -618,6 +629,10 @@ namespace GNTechnology
         public override void OnUpdate()
         {
             base.OnUpdate();
+            if (engineOn && part.Resources["GNparticle"].amount < 1)
+            {
+                engineOn = false;
+            }
         }
     }
 
@@ -665,7 +680,7 @@ namespace GNTechnology
                 ps.AgOn = false;
                 ps.HvOn = true;
             }
-            if (engineOn && part.Resources["GNparticle"].amount < 0)
+            if (engineOn && part.Resources["GNparticle"].amount < 1)
             {
                 engineOn = false;
             }

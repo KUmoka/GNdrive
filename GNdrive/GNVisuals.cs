@@ -78,16 +78,18 @@ namespace GNTechnology
 
         public static void UpdateVisual(in GNVisualState vs)
         {
+
+            // NRE avoidance
+            if (vs.part == null)
+            {
+                return;
+            }
+
+            // variables
             Vessel vessel = vs.part.vessel;
             bool brakes = vessel.ActionGroups[KSPActionGroup.Brakes];
             Vector3 vSrf = (Vector3)vessel.srf_velocity;
             float speed = vSrf.magnitude;
-
-            // NRE avoidance
-            if (vs.part == null)
-            { 
-                return; 
-            }
 
             // Engine:On => update visual effects
             float level = GetLevel(vs);
@@ -195,8 +197,8 @@ namespace GNTechnology
                 // Smoothly adjust emission rates
                 e.enabled = true;
                 e.emit = true;
-                e.minEmission = (int)Mathf.Lerp(e.minEmission, tMin, 10f);
-                e.maxEmission = (int)Mathf.Lerp(e.maxEmission, tMax, 10f);
+                e.minEmission = (int)Mathf.Lerp(e.minEmission, tMin, 100f * Time.deltaTime); //10f for last
+                e.maxEmission = (int)Mathf.Lerp(e.maxEmission, tMax, 100f * Time.deltaTime);
                 e.localVelocity = new Vector3(0f, -1 * Mathf.Lerp(5f, 45f, level), 0f);
 
                 // particle coloring system
