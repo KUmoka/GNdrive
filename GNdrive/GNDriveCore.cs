@@ -222,7 +222,7 @@ namespace GNTechnology
                 MaxG = accel
             };
 
-            if (OnOff == current) return;
+            if (OnOff == current && IsThereOtherSyncDriveTarget(vessel, part.persistentId)) return;
             else OnOff = current;
             GNSynchronizer.SynchronizeOtherTargetDrive(OnOff, vessel, part.persistentId, ref ps);
             SetMaxG(0, MaxAccel * ps.SyncRate);

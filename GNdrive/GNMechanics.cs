@@ -139,6 +139,35 @@ namespace GNTechnology
             public static bool operator ==(OnOffList a, OnOffList b) => a.Equals(b);
             public static bool operator !=(OnOffList a, OnOffList b) => !a.Equals(b);
         }
+        
+        public static bool IsThereOtherSyncDriveTarget(Vessel vessel, uint myID)
+        {
+            // future: return true when there are other syncing drive.
+            foreach (var p in vessel.parts)
+            {
+                var taus = p.FindModulesImplementing<GNDriveTauSystem>();
+                var gns = p.FindModulesImplementing<GNDriveSystem>();
+                int count = 0;
+
+                foreach (var m in taus)
+                {
+                    if (!m.SyOn) continue;
+                    count++;
+                    if (myID == p.persistentId && count > 1) return true;
+                }
+
+                // reset
+                count = 0;
+
+                foreach (var m in gns)
+                {
+                    if (!m.SyOn) continue;
+                    count++;
+                    if (myID == p.persistentId && count > 1) return true;
+                }
+            }
+            return false;
+        }
 
         public static void SynchronizeOtherTargetDrive(OnOffList OnOffLst, Vessel vessel, uint myID, ref GNPhysicsState ps)
         {
@@ -194,7 +223,7 @@ namespace GNTechnology
             int Ngn = deviation.Count;
 
             // No sync.
-            if (Ngn == 0 && NTau == 0)
+            if (Ngn <= 1 && NTau <= 1)
             {
                 ps.SyncRate = 1f;
                 return;
