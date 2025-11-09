@@ -160,10 +160,7 @@ namespace GNTechnology
 
             // Base Thrust, if one adds another force, one shall add like Ag/Hv
             float support = (ps.AgOn ? gLocal : 0f) + (ps.HvOn ? aHover : 0f); // Hv, Ag accel considered here.
-            if (brakes)
-                accelMag = brakeDir.magnitude * (actualG - support) + support;// m/s^2
-            else
-                accelMag = ThrustDirection.magnitude * (actualG - support) + support;// m/s^2
+            accelMag = (brakes ? brakeDir.magnitude : ThrustDirection.magnitude) * (actualG - support) + support; // m/s^2, ternary operator
 
             // consumption calculation
             double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime; //now include hover consumption.
@@ -215,10 +212,8 @@ namespace GNTechnology
                 float BrakeMag = 1f;
                 if (speed < 0.2) BrakeMag = 0.05f;
 
-                if (brakes) // Brake on
-                    p2.AddForce(brakeDir * ThrustBudget * BrakeMag * limitFactor * p2.rb.mass);
-                else
-                    p2.AddForce(ThrustDirection * (ThrustBudget) * limitFactor * p2.rb.mass);
+                // Calc force
+                p2.AddForce((brakes ? brakeDir * BrakeMag : ThrustDirection) * ThrustBudget * limitFactor * p2.rb.mass);
             }
 
             // apply consumption
