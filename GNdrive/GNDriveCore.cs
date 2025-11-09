@@ -56,6 +56,10 @@ namespace GNTechnology
         // struct for Sync
         public OnOffList OnOff = OnOffList.Empty;
 
+        //KSP field for sync
+        [KSPField(guiActiveEditor = false, guiActive = false, isPersistant = false, guiName = "MarkAsDirty")]
+        public bool MarkDirty = false;
+
         //variables for audio.
         [KSPField] public string audioPath = "GNdrive/Audio/GNDriveTypical";
         AudioClip soundClip;
@@ -92,7 +96,6 @@ namespace GNTechnology
         // KSP field for Particle/EC Generation rate (Condenser = 0)
         [KSPField(guiName = "Particle Generation", guiActive = true, guiActiveEditor = true, isPersistant = true)]
         public float ParticleGeneration = 0f;
-
         [KSPField(guiName = "ElectricCharge Generation", guiActive = false, guiActiveEditor = false, isPersistant = true)]
         public double ECGeneration = 0f;
 
@@ -222,9 +225,20 @@ namespace GNTechnology
                 MaxG = accel
             };
 
-            if (OnOff == current && IsThereOtherSyncDriveTarget(vessel, part.persistentId)) return;
-            else OnOff = current;
-            GNSynchronizer.SynchronizeOtherTargetDrive(OnOff, vessel, part.persistentId, ref ps);
+            // usual state
+            if (OnOff == current && IsThereOtherSyncDriveTarget(vessel, part.persistentId))
+            {
+                MarkDirty = false; //no change for both drive
+                return;
+            }
+
+            // accel changed by user
+            if (!(OnOff == current)) MarkDirty = true;
+
+            // Do sync
+            OnOff = current;
+            if (MarkDirty) GNSynchronizer.SynchronizeOtherTargetDrive(OnOff, vessel, part.persistentId, ref ps);
+            MarkDirty = false;
             SetMaxG(0, MaxAccel * ps.SyncRate);
             SynchronizeRate = ps.SyncRate;
         }

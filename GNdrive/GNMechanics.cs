@@ -5,6 +5,60 @@ using static GNTechnology.GNSynchronizer;
 
 namespace GNTechnology
 {
+    public class GNLists : VesselModule
+    {
+        // future sync mechanism
+        public List<GNThrusterSystem> GNThruster = new List<GNThrusterSystem>();
+        public List<GNCondenserDriveSystem> GNCondernserDrive = new List<GNCondenserDriveSystem>();
+        public List<GNDriveSystem> GNDrive = new List<GNDriveSystem>();
+        public List<GNDriveTauSystem> GNDriveTau = new List<GNDriveTauSystem>();
+
+        public override bool ShouldBeActive()
+        {
+            // GN系 PartModule を1つでも積んでいれば有効化
+            return false;//vessel != null && (vessel.FindPartModulesImplementing<GNBaseSystem>().Count > 0);
+        }
+
+        protected override void OnStart()
+        {
+            base.OnStart();
+            MakeDriveList();
+            Debug.Log("GNLists created");
+        }
+
+        private void MakeDriveList()
+        {
+            foreach (var p in vessel.parts)
+            {
+                var th = p.FindModulesImplementing<GNThrusterSystem>();
+                var con = p.FindModulesImplementing<GNCondenserDriveSystem>();
+                var taus = p.FindModulesImplementing<GNDriveTauSystem>();
+                var gns = p.FindModulesImplementing<GNDriveSystem>();
+
+                foreach (var m in th)
+                {
+                    GNThruster.Add(m);
+                }
+
+                foreach (var m in con)
+                {
+                    GNCondernserDrive.Add(m);
+                }
+
+                foreach (var m in taus)
+                {
+                    GNDriveTau.Add(m);
+                }
+
+                foreach (var m in gns)
+                {
+                    GNDrive.Add(m);
+                }
+            }
+        }
+
+    }
+
     public static class GNVisualAggregator
     {
         public struct Result
