@@ -136,6 +136,14 @@ namespace GNTechnology
                         if (d.ps.TaOn) taCount++;
                         TotalParticlePower += d.ps.ParticlePower;
                     }
+                    else if (m is GNThrusterSystem s && s.ps.EngineState)
+                    {
+                        driveCount++;
+                        if (s.ps.AgOn) agCount++;
+                        if (s.ps.HvOn) hvCount++;
+                        if (s.ps.TaOn) taCount++;
+                        TotalParticlePower += s.ps.ParticlePower;
+                    }
                 }
             }
 

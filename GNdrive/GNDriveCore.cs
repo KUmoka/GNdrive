@@ -606,7 +606,7 @@ namespace GNTechnology
         }
     }
 
-    public class  GNThrusterSystem : GNBaseSystem // GN thrusters
+    public class GNThrusterSystem : GNBaseSystem // GN thrusters
     {
         [KSPField(guiName = "Max Particle Output", guiActive = true)]
         public float particlepower = 200f;
@@ -633,6 +633,7 @@ namespace GNTechnology
 
             vs.Mode = GNVisualMode.Drive;
             vs.RotorSpeed = 180f; // thruster rotor speed
+            vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
 
@@ -647,6 +648,11 @@ namespace GNTechnology
             {
                 engineOn = false;
             }
+        }
+
+        public override void OnFixedUpdate()
+        {
+            base.OnFixedUpdate();
         }
     }
 
