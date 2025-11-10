@@ -105,6 +105,8 @@ namespace GNTechnology
             Vector3 vSrf = (Vector3)vessel.srf_velocity;
             float speed = vSrf.magnitude;
             if (speed < 1) speed = 1f; // speed cramp
+            float BrakeMag = 1f;
+            if (speed == 1) BrakeMag = 0.05f;// speed == 1 is clamp active case.
             Vector3 brakeDir = -vSrf / speed; // unit vector until speed < 1
 
             // Find active drives per functions.
@@ -168,7 +170,7 @@ namespace GNTechnology
 
             // Base Thrust, if one adds another force, one shall add like Ag/Hv
             float support = (ps.AgOn ? gLocal : 0f) + (ps.HvOn ? aHover : 0f); // Hv, Ag accel considered here.
-            accelMag = (brakes ? brakeDir.magnitude : ThrustDirection.magnitude) * (actualG - support) + support; // m/s^2, ternary operator
+            accelMag = (brakes ? brakeDir.magnitude * BrakeMag : ThrustDirection.magnitude) * (actualG - support) + support; // m/s^2, ternary operator
 
             // consumption calculation
             double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime; //now include hover consumption.
@@ -215,10 +217,8 @@ namespace GNTechnology
                     aHover = 0f;
                 }
 
-                // Main thrust or brakes
+                // Main thrust or brakes, it shouldn't be less than 0
                 float ThrustBudget = Mathf.Max(0f, actualG - aHover - gLocal);
-                float BrakeMag = 1f;
-                if (speed < 0.2) BrakeMag = 0.05f;
 
                 // Calc force
                 p2.AddForce((brakes ? brakeDir * BrakeMag : ThrustDirection) * ThrustBudget * limitFactor * p2.rb.mass);
