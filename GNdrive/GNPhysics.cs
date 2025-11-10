@@ -281,7 +281,7 @@ namespace GNTechnology
 
                 // Tau drive
                 //if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount - GNGen && TD.amount <= 0.5)
-                actualAdd = ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
+                actualAdd = ps.part.RequestResource("GNparticle", (double)(-1 * GNGen)); // particle added here.
 
                 // GNGen > 0, actualAdd < 0
                 if (actualAdd < 0 && TD.amount <= 0.5)
@@ -303,7 +303,6 @@ namespace GNTechnology
                 else if (TD.amount > 0.5)// GN drive or GN drive Tau with TD
                 {
                     ps.part.RequestResource("ElectricCharge", ECReqGen);
-                    ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
                 }
             }
         }

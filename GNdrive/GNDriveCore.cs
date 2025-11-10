@@ -245,9 +245,11 @@ namespace GNTechnology
 
         private void ParticleGenerationUpdate()
         {
+            // Editor, no need for PG
             if (!HighLogic.LoadedSceneIsFlight || vessel == null) 
                 return;
 
+            // Time Warp, particle generation continues in timewarp.
             if (vessel.packed)
                 GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.deltaTime);
         }
@@ -894,6 +896,7 @@ namespace GNTechnology
             }
             else
             {
+                ECOn = false; // prevent ElectricCharge drawn when power down.
                 engineOn = false; // GN Drive power down.
             }
         }
