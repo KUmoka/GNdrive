@@ -271,21 +271,22 @@ namespace GNTechnology
 
     public static class GNColorDecider
     {
+        private static readonly Color DefaultColor = new Color(1f, 0f, 0.15f, 1f);
+
         public static Color ParticleColor(in GNVisualState vs)
         {
-            // NPE check
-            float TDmax = (float)vs.part.Resources["TopologicalDefects"].maxAmount;
+            if (vs.part == null) return DefaultColor;
 
-            // NPE avoid
-            if (TDmax == 0) return new Color(1f, 0f, 0.15f, 1f);
+            var res = vs.part.Resources["TopologicalDefects"];
+            if (res == null || res.maxAmount <= 0) return DefaultColor;
 
-            float TDnow = (float)vs.part.Resources["TopologicalDefects"].amount;
-            float r = 1f - TDnow / TDmax;
-            float g = TDnow / TDmax;
+            float ratio = (float)(res.amount / res.maxAmount);
+            float r = 1f - ratio;
+            float g = ratio;
             float b = (40f * (1 - g) + 170f * g) / 255f;
 
-            // intermix
-            return new Color(r, g, b, 1f); // Red for condenser.
+            return new Color(r, g, b, 1f);
         }
     }
+
 }
