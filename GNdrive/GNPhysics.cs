@@ -162,8 +162,8 @@ namespace GNTechnology
                 TotalParticlePower = TotalParticlePower + 2f * ps.ParticlePower * ps.SyncRate; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
             }
 
-            // Particle Generation furnace.
-            GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.fixedDeltaTime);
+            // Particle Generation furnace.no longer placed here.
+            // GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.fixedDeltaTime);
 
             // Resource drain calculation
             double mass = vessel.GetTotalMass(); // KSP1.12はdouble
@@ -280,27 +280,22 @@ namespace GNTechnology
                 double GNGen = ps.ParticleGenRate * ps.SyncRate * dt;
 
                 // Tau drive
-                //if (ps.part.Resources["GNparticle"].amount < ps.part.Resources["GNparticle"].maxAmount - GNGen && TD.amount <= 0.5)
                 actualAdd = ps.part.RequestResource("GNparticle", (double)(-1 * GNGen)); // particle added here.
 
-                // GNGen > 0, actualAdd < 0
+                // GNGen > 0, actualAdd < 0, almost particle full
                 if (actualAdd < 0 && TD.amount <= 0.5)
                 {
                     // EC draw
                     var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen * (actualAdd / (-1 * GNGen)));
-                    //Debug.Log(ECReqGen * (actualAdd / GNGen));
 
                     // Enough EC or not?
                     if (Pulled <= 0.5 * dt)
                     {
                         ps.ECOn = false;
                         return;
-                    } 
-
-                    // EC -> GNP reaction.
-                    // ps.part.RequestResource("GNparticle", (double)(-1 * GNGen));
+                    }
                 }
-                else if (TD.amount > 0.5)// GN drive or GN drive Tau with TD
+                else if (TD.amount > 0.5)// GN drive or GN drive Tau with TD, power-generation mode, ECReqGen < 0
                 {
                     ps.part.RequestResource("ElectricCharge", ECReqGen);
                 }

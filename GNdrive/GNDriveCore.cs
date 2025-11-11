@@ -164,6 +164,7 @@ namespace GNTechnology
         public override void OnFixedUpdate()
         {
             base.OnFixedUpdate();
+            ParticleGenerationFixedUpdate();
             PhysicsUpdate();
         }
 
@@ -252,6 +253,12 @@ namespace GNTechnology
             // Time Warp, particle generation continues in timewarp.
             if (vessel.packed)
                 GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.deltaTime);
+        }
+
+        private void ParticleGenerationFixedUpdate()
+        {
+            ps.ECOn = ECOn;
+            GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.fixedDeltaTime);
         }
 
         private void VisualUpdate()
