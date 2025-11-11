@@ -15,9 +15,7 @@ using static VehiclePhysics.ProjectPatchAsset;
 
 namespace GNTechnology
 {
-    //public enum DriveState {Unsynchronized, Depleted, Activated, Deactivated, Refilled}
-
-    public enum DriveState
+    public enum DriveState //public enum DriveState {Unsynchronized, Depleted, Activated, Deactivated, Refilled}
     {
         [Description("⚠ Unsync!")]
         Unsynchronized,
@@ -760,7 +758,8 @@ namespace GNTechnology
 
             vs.Mode = GNVisualMode.Drive;
             vs.RotorSpeed = 180f; // thruster rotor speed
-            vs.ParticleColor = ParticleColor(); // Red for condenser.
+            //vs.ParticleColor = ParticleColor(); // Red for condenser.
+            vs.ParticleColor = GNColorDecider.ParticleColor(vs);
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
 
@@ -774,7 +773,8 @@ namespace GNTechnology
         public override void OnUpdate()
         {
             base.OnUpdate();
-            vs.ParticleColor = ParticleColor(); // Red for condenser, To avoid override on GNBaseSystem Class(DecideColor).
+            //vs.ParticleColor = ParticleColor(); // Red for condenser, To avoid override on GNBaseSystem Class(DecideColor).
+            vs.ParticleColor = GNColorDecider.ParticleColor(vs);
             ps.SafeGuard = sgOn;
             if (hvOn && agOn)
             {
@@ -866,7 +866,8 @@ namespace GNTechnology
             engineOn = true; // GN Drive is always on.
             ECOn = true; // GN Drive generates EC through EC consumption calculation method.
             vs.Mode = GNVisualMode.Drive;
-            vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
+            //vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
+            vs.ParticleColor = GNColorDecider.ParticleColor(vs);
             ps.ParticlePower = particlepower;
             ps.SafeGuard = false; // No need for safeguard for perpetual drive.
             ps.MaxG = accel;
@@ -920,7 +921,8 @@ namespace GNTechnology
             }
             else
             {
-                vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
+                //vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
+                vs.ParticleColor = GNColorDecider.ParticleColor(vs);
             }
         }
     }

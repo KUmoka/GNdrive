@@ -268,4 +268,24 @@ namespace GNTechnology
                       $"hasPS={(e.GetComponent<ParticleSystem>() != null)}");
         }
     }
+
+    public static class GNColorDecider
+    {
+        public static Color ParticleColor(in GNVisualState vs)
+        {
+            // NPE check
+            float TDmax = (float)vs.part.Resources["TopologicalDefects"].maxAmount;
+
+            // NPE avoid
+            if (TDmax == 0) return new Color(1f, 0f, 0.15f, 1f);
+
+            float TDnow = (float)vs.part.Resources["TopologicalDefects"].amount;
+            float r = 1f - TDnow / TDmax;
+            float g = TDnow / TDmax;
+            float b = (40f * (1 - g) + 170f * g) / 255f;
+
+            // intermix
+            return new Color(r, g, b, 1f); // Red for condenser.
+        }
+    }
 }
