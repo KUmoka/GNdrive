@@ -159,7 +159,7 @@ namespace GNTechnology
         {
             if (MoveObjects == null) return;
 
-            float maxOffset = 2.0f; // later bundle all consts.
+            float maxOffset = 1.0f; // later bundle all consts.
             float ty = -1 * (level - 0.1f) * 1.1f * maxOffset; //1.1 * 0.9 almost 1
             Vector3 moveAxis = new Vector3(0, ty, 0);
 
@@ -171,7 +171,6 @@ namespace GNTechnology
                     t.localPosition = new Vector3(0, t.localPosition.y + 0.002f);
                 else if (t.localPosition.y > ty)
                     t.localPosition = new Vector3(0, t.localPosition.y - 0.002f);
-                //if (t) t.localPosition = Vector3.zero + moveAxis;
             }
 
         }
