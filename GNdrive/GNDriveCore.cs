@@ -44,6 +44,7 @@ namespace GNTechnology
         List<Light> listL = new List<Light>();
         List<Renderer> listR = new List<Renderer>();
         List<KSPParticleEmitter> listE = new List<KSPParticleEmitter>();
+        List<Transform> listM = new List<Transform>();
 
         // variables for control state
         float X = 0f;
@@ -400,7 +401,7 @@ namespace GNTechnology
             vs.EmissiveRenderers = listR.ToArray();
             vs.GlowLights = listL.ToArray();
             vs.ParticleEmitters = listE.ToArray();
-
+            vs.MovingParts = listM.ToArray();
             // parts specific values
             vs.RotorSpeed = 60f; // condenser rotor speed
         }
@@ -412,13 +413,16 @@ namespace GNTechnology
             listL.Clear();
             listR.Clear();
             listE.Clear();
+            listM.Clear();
 
             // Make lists of Lights, Renderers, Emitters, etc. here if needed.
             var allT = part.transform.GetComponentsInChildren<Transform>(true);
             foreach (var t in allT)
             {
                 if (t.name.Contains("rotor") && t.GetComponentInParent<Part>() == this.part)
-                    listT.Add(t);
+                    listT.Add(t);// Rotating parts
+                if (t.name.Contains("_Move") && t.GetComponentInParent<Part>() == this.part)
+                    listM.Add(t);// Moving Parts
             }
 
             var allL = part.transform.GetComponentsInChildren<Light>(true);
@@ -431,7 +435,6 @@ namespace GNTechnology
             var allR = part.transform.GetComponentsInChildren<Renderer>(true);
             foreach (var r in allR)
             {
-                // if (r.name.Contains("rotor") || r.name.Contains("stator") && r.GetComponentInParent<Part>() == this.part)
                 if ((r.name.Contains("rotor") || r.name.Contains("stator")) && r.GetComponentInParent<Part>() == this.part)
                     listR.Add(r);
             }

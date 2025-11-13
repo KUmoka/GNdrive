@@ -1,5 +1,6 @@
 ﻿using KSP;
 using System;
+using System.Linq;
 using UnityEngine;
 using static iT;
 
@@ -22,6 +23,7 @@ namespace GNTechnology
         public Light[] GlowLights; //glow light sources
         public Renderer[] EmissiveRenderers; //emissive renderers(rotor, stator)
         public KSPParticleEmitter[] ParticleEmitters; //EMI (particle emitters)
+        public Transform[] MovingParts; // for thrusters
 
 
         public static GNVisualState Empty => new GNVisualState
@@ -38,7 +40,8 @@ namespace GNTechnology
             Rotors = Array.Empty<Transform>(),
             GlowLights = Array.Empty<Light>(),
             EmissiveRenderers = Array.Empty<Renderer>(),
-            ParticleEmitters = Array.Empty<KSPParticleEmitter>()
+            ParticleEmitters = Array.Empty<KSPParticleEmitter>(),
+            MovingParts = Array.Empty<Transform>()
         };
     }
 
@@ -119,6 +122,7 @@ namespace GNTechnology
                 // if brake, less particle emission and light.
                 if (brakes && speed < 0.05 && (vs.Mode == GNVisualMode.Drive)) level = 0.1f;
                 UpdateRotor(vs.Rotors, vs.RotorSpeed, level); // usual
+                UpdateMove(vs.MovingParts, level); // Moving parts
                 UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level);
                 if (vs.Mode != GNVisualMode.Condenser) UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, level);
             }
@@ -149,6 +153,27 @@ namespace GNTechnology
                 var t = rotors[i];
                 if (t) t.Rotate(0f, speed * dt, 0f, Space.Self);
             }
+        }
+
+        private static void UpdateMove(Transform[] MoveObjects, float level)// Move Thruster Parts if needed.
+        {
+            if (MoveObjects == null) return;
+
+            float maxOffset = 2.0f; // later bundle all consts.
+            float ty = -1 * (level - 0.1f) * 1.1f * maxOffset; //1.1 * 0.9 almost 1
+            Vector3 moveAxis = new Vector3(0, ty, 0);
+
+            for (int i = 0; i < MoveObjects.Length; i++)
+            {
+                var t = MoveObjects[i];
+                if (!t) continue;
+                if (t.localPosition.y < ty)
+                    t.localPosition = new Vector3(0, t.localPosition.y + 0.002f);
+                else if (t.localPosition.y > ty)
+                    t.localPosition = new Vector3(0, t.localPosition.y - 0.002f);
+                //if (t) t.localPosition = Vector3.zero + moveAxis;
+            }
+
         }
 
         private static void UpdateGlow(Renderer[] renderers, Light[] lights, Color c, float level) // update emissive color and light intensity
