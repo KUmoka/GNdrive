@@ -264,7 +264,7 @@ namespace GNTechnology
         {
             vs.EngineState = engineOn;
             vs.InputLevel = InputLevel();
-            GNVisuals.UpdateVisual(vs);
+            GNVisuals.UpdateVisual(ref vs);
         }
 
         private void PhysicsUpdate()

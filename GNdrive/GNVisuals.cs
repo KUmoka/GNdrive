@@ -15,6 +15,7 @@ namespace GNTechnology
         public GNVisualMode Mode;//Visual mode.Condenser or Drive.
         public Color ParticleColor; //green:original drive, red:tau drive
         public float InputLevel; //from 0 to 1
+        public float Smoothed; //from 0 to 1
         public float RotorSpeed; // rotor speed (degree per second)
         public bool EngineState; //true:engine on, false:engine off
 
@@ -33,6 +34,7 @@ namespace GNTechnology
             Mode = GNVisualMode.Condenser,
             ParticleColor = Color.black,
             InputLevel = 0f,
+            Smoothed = 0f,
             RotorSpeed = 0,
             EngineState = false,
 
@@ -47,15 +49,20 @@ namespace GNTechnology
 
     public static class GNVisuals
     {
+        // consts
+        private static float StepBase = 0.5f;
+
         public static void SetOff(in GNVisualState vs)// for initialization
         {
             // part is null=> do nothing
             if (vs.part == null) return;
 
+            float smoothed;// for smoothed rotation.
+
             // stop all visual effects
             UpdateRotor(vs.Rotors, 0f,0f); // no rotation
             UpdateMove(vs.MovingParts,0f);
-            UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, 0f);
+            UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, 0f, out smoothed);
             if (vs.ParticleEmitters != null)//no emitters = condenser.
             {
                 for (int i = 0; i < vs.ParticleEmitters.Length; i++)
@@ -75,15 +82,16 @@ namespace GNTechnology
             // part is null=> do nothing
             if (vs.part == null) return;
 
+            float smoothed;// for smoothed rotation.
+
             UpdateRotor(vs.Rotors, 0f, 0f); // no rotation
             UpdateMove(vs.MovingParts, level);
-            UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level); // Condenser glow
+            UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed); // Condenser glow
             UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, 0f); // no particle emission
         }
 
-        public static void UpdateVisual(in GNVisualState vs)
+        public static void UpdateVisual(ref GNVisualState vs)
         {
-
             // NRE avoidance
             if (vs.part == null)
             {
@@ -95,6 +103,8 @@ namespace GNTechnology
             bool brakes = vessel.ActionGroups[KSPActionGroup.Brakes];
             Vector3 vSrf = (Vector3)vessel.srf_velocity;
             float speed = vSrf.magnitude;
+            float smoothed;// for smoothed rotation.
+            float step = StepBase * Time.deltaTime;
 
             // Engine:On => update visual effects
             float level = GetLevel(vs);
@@ -115,19 +125,27 @@ namespace GNTechnology
                 // if brake, less particle emission and light.
                 if (brakes && speed < 0.05) lv = 0.1f;
 
-                UpdateRotor(vs.Rotors, vs.RotorSpeed, lv);
-                UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level);
+                // normal update
+                UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed);
                 UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, lv);
+
+                // smoothed should be determined by previous step smoothed and step.
+                smoothed = Mathf.MoveTowards(vs.Smoothed, lv, step);
             }
             else
             {
                 // if brake, less particle emission and light.
                 if (brakes && speed < 0.05 && (vs.Mode == GNVisualMode.Drive)) level = 0.1f;
-                UpdateRotor(vs.Rotors, vs.RotorSpeed, level); // usual
+
+                // normal update
                 UpdateMove(vs.MovingParts, level); // Moving parts
-                UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level);
+                UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed);
                 if (vs.Mode != GNVisualMode.Condenser) UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, level);
             }
+
+            // use modified level
+            UpdateRotor(vs.Rotors, vs.RotorSpeed, smoothed); // usual
+            vs.Smoothed = smoothed;
         }
 
         private static float GetLevel(in GNVisualState vs) // set emission, rotation and particle emission level
@@ -143,27 +161,13 @@ namespace GNTechnology
             return (float)(res.amount / res.maxAmount);
         }
 
-        private static void UpdateRotor(Transform[] rotors, float rotorspeed, float level)// rotate rotors
-        {
-            if (rotors == null) return;
-            float dt = Time.deltaTime;
-            float speed = rotorspeed * level;
-
-            // Rotation control logic here.
-            for (int i = 0; i < rotors.Length; i++)
-            {
-                var t = rotors[i];
-                if (t) t.Rotate(0f, speed * dt, 0f, Space.Self);
-            }
-        }
-
         private static void UpdateMove(Transform[] MoveObjects, float level)// Move Thruster Parts if needed.
         {
             if (MoveObjects == null) return;
 
             float maxOffset = 0.4f;
             float targetY = -1 * Mathf.Clamp01(level) * maxOffset;  // 目標位置
-            float speed = 0.5f;                  // m/s など
+            float speed = StepBase;                  // m/s など
             float step = speed * Time.deltaTime; // フレーム依存を解決
 
             for (int i = 0; i < MoveObjects.Length; i++)
@@ -180,19 +184,16 @@ namespace GNTechnology
                 // MoveTowards なら絶対に振動しない
                 t.localPosition = Vector3.MoveTowards(current, target, step);
             }
-
         }
 
-        private static void UpdateGlow(Renderer[] renderers, Light[] lights, Color c, float level) // update emissive color and light intensity
+        private static void UpdateGlow(Renderer[] renderers, Light[] lights, Color c, float level, out float smoothedLevel) // ← スムーズされたレベルを外に出す
         {
-            if (renderers == null && lights == null) return;
+            float step = StepBase * Time.deltaTime;
 
-            // 一括設定（ループ外）
-            float glowSpeed = 0.8f;
-            float step = glowSpeed * Time.deltaTime;
+            // ループに入る前のデフォルト値（renderersが無い時用に一応）
+            smoothedLevel = level;
 
-            // emissive / light 両方で使うターゲット色
-            // level=0 → 真っ黒、level=1 → cそのもの、というイメージ
+            // 目標色（EmissiveとLight共通）
             Color targetColor = c * level;
             targetColor.a = level;
 
@@ -207,7 +208,7 @@ namespace GNTechnology
                     var mat = r.material; // 個別インスタンス
                     if (mat == null || !mat.HasProperty("_EmissiveColor")) continue;
 
-                    // 現在の EmissiveColor を取得
+                    // 現在の EmissiveColor を取得（=前フレームの状態）
                     Color now = mat.GetColor("_EmissiveColor");
 
                     // 各成分を MoveTowards
@@ -216,11 +217,12 @@ namespace GNTechnology
                     float nb = Mathf.MoveTowards(now.b, targetColor.b, step);
                     float na = Mathf.MoveTowards(now.a, targetColor.a, step);
 
-                    // 新しい色
                     Color outColor = new Color(nr, ng, nb, na);
 
-                    // 反映
                     mat.SetColor("_EmissiveColor", outColor);
+
+                    // このマテリアルに対して適用した最終αを「スムーズ済みレベル」として利用
+                    smoothedLevel = na;
                 }
             }
 
@@ -236,16 +238,15 @@ namespace GNTechnology
                     var l = lights[i];
                     if (!l) continue;
 
-                    // 現在値を取得
                     float nowInt = l.intensity;
                     float nowRange = l.range;
                     Color nowCol = l.color;
 
-                    // ===== float は MoveTowards 一発でOK =====
+                    // float
                     float newInt = Mathf.MoveTowards(nowInt, targetInt, step);
                     float newRange = Mathf.MoveTowards(nowRange, targetRange, step);
 
-                    // ===== Color は各成分ごとに MoveTowards =====
+                    // Color成分
                     float lr = Mathf.MoveTowards(nowCol.r, targetColor.r, step);
                     float lg = Mathf.MoveTowards(nowCol.g, targetColor.g, step);
                     float lb = Mathf.MoveTowards(nowCol.b, targetColor.b, step);
@@ -253,7 +254,6 @@ namespace GNTechnology
 
                     Color newColor = new Color(lr, lg, lb, la);
 
-                    // ライトへ反映
                     l.intensity = newInt;
                     l.range = newRange;
                     l.color = newColor;
@@ -330,6 +330,20 @@ namespace GNTechnology
             var g2 = new Gradient();
             g2.SetKeys(new[]{new GradientColorKey(new Color(c.r,c.g,c.b), 0f), new GradientColorKey(new Color(c.r,c.g,c.b), 1f)}, new[]{new GradientAlphaKey(a0, 0f), new GradientAlphaKey(a2, 0.5f), new GradientAlphaKey(a4, 1f)});
             colOL.color = new ParticleSystem.MinMaxGradient(g2);
+        }
+
+        private static void UpdateRotor(Transform[] rotors, float rotorspeed, float level)// rotate rotors, note that this sub itself doesn't depends on previous state.
+        {
+            if (rotors == null) return;
+            float dt = Time.deltaTime;
+            float speed = rotorspeed * level;
+
+            // Rotation control logic here.
+            for (int i = 0; i < rotors.Length; i++)
+            {
+                var t = rotors[i];
+                if (t) t.Rotate(0f, speed * dt, 0f, Space.Self);
+            }
         }
 
         // for debug.
