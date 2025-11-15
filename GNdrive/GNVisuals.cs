@@ -54,6 +54,7 @@ namespace GNTechnology
 
             // stop all visual effects
             UpdateRotor(vs.Rotors, 0f,0f); // no rotation
+            UpdateMove(vs.MovingParts,0f);
             UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, 0f);
             if (vs.ParticleEmitters != null)//no emitters = condenser.
             {
@@ -75,6 +76,7 @@ namespace GNTechnology
             if (vs.part == null) return;
 
             UpdateRotor(vs.Rotors, 0f, 0f); // no rotation
+            UpdateMove(vs.MovingParts, level);
             UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level); // Condenser glow
             UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, 0f); // no particle emission
         }
@@ -159,26 +161,40 @@ namespace GNTechnology
         {
             if (MoveObjects == null) return;
 
-            float maxOffset = 1.0f; // later bundle all consts.
-            float ty = -1 * (level - 0.1f) * 1.1f * maxOffset; //1.1 * 0.9 almost 1
-            Vector3 moveAxis = new Vector3(0, ty, 0);
+            float maxOffset = 0.4f;
+            float targetY = -1 * Mathf.Clamp01(level) * maxOffset;  // 目標位置
+            float speed = 0.5f;                  // m/s など
+            float step = speed * Time.deltaTime; // フレーム依存を解決
 
             for (int i = 0; i < MoveObjects.Length; i++)
             {
                 var t = MoveObjects[i];
                 if (!t) continue;
-                if (t.localPosition.y < ty)
-                    t.localPosition = new Vector3(0, t.localPosition.y + 0.002f);
-                else if (t.localPosition.y > ty)
-                    t.localPosition = new Vector3(0, t.localPosition.y - 0.002f);
+
+                // 目標位置 (Vector3.zero が基準)
+                Vector3 target = new Vector3(0f, targetY, 0f);
+
+                // 現在位置
+                Vector3 current = t.localPosition;
+
+                // MoveTowards なら絶対に振動しない
+                t.localPosition = Vector3.MoveTowards(current, target, step);
             }
 
         }
 
         private static void UpdateGlow(Renderer[] renderers, Light[] lights, Color c, float level) // update emissive color and light intensity
         {
-            Color glow = c;
-            glow.a = level; //a = alpha channel = intensity
+            if (renderers == null && lights == null) return;
+
+            // 一括設定（ループ外）
+            float glowSpeed = 0.8f;
+            float step = glowSpeed * Time.deltaTime;
+
+            // emissive / light 両方で使うターゲット色
+            // level=0 → 真っ黒、level=1 → cそのもの、というイメージ
+            Color targetColor = c * level;
+            targetColor.a = level;
 
             // Emissive
             if (renderers != null)
@@ -187,8 +203,24 @@ namespace GNTechnology
                 {
                     var r = renderers[i];
                     if (!r) continue;
-                    if (r.sharedMaterial != null && r.sharedMaterial.HasProperty("_EmissiveColor"))
-                        r.sharedMaterial.SetColor("_EmissiveColor", glow);
+
+                    var mat = r.material; // 個別インスタンス
+                    if (mat == null || !mat.HasProperty("_EmissiveColor")) continue;
+
+                    // 現在の EmissiveColor を取得
+                    Color now = mat.GetColor("_EmissiveColor");
+
+                    // 各成分を MoveTowards
+                    float nr = Mathf.MoveTowards(now.r, targetColor.r, step);
+                    float ng = Mathf.MoveTowards(now.g, targetColor.g, step);
+                    float nb = Mathf.MoveTowards(now.b, targetColor.b, step);
+                    float na = Mathf.MoveTowards(now.a, targetColor.a, step);
+
+                    // 新しい色
+                    Color outColor = new Color(nr, ng, nb, na);
+
+                    // 反映
+                    mat.SetColor("_EmissiveColor", outColor);
                 }
             }
 
@@ -196,13 +228,35 @@ namespace GNTechnology
             if (lights != null)
             {
                 float baseIntensity = 10f;
+                float targetInt = baseIntensity * level;
+                float targetRange = level;
+
                 for (int i = 0; i < lights.Length; i++)
                 {
                     var l = lights[i];
                     if (!l) continue;
-                    l.range = level;
-                    l.color = glow;
-                    l.intensity = baseIntensity * level;
+
+                    // 現在値を取得
+                    float nowInt = l.intensity;
+                    float nowRange = l.range;
+                    Color nowCol = l.color;
+
+                    // ===== float は MoveTowards 一発でOK =====
+                    float newInt = Mathf.MoveTowards(nowInt, targetInt, step);
+                    float newRange = Mathf.MoveTowards(nowRange, targetRange, step);
+
+                    // ===== Color は各成分ごとに MoveTowards =====
+                    float lr = Mathf.MoveTowards(nowCol.r, targetColor.r, step);
+                    float lg = Mathf.MoveTowards(nowCol.g, targetColor.g, step);
+                    float lb = Mathf.MoveTowards(nowCol.b, targetColor.b, step);
+                    float la = Mathf.MoveTowards(nowCol.a, targetColor.a, step);
+
+                    Color newColor = new Color(lr, lg, lb, la);
+
+                    // ライトへ反映
+                    l.intensity = newInt;
+                    l.range = newRange;
+                    l.color = newColor;
                 }
             }
         }

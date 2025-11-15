@@ -134,7 +134,7 @@ namespace GNTechnology
             // Check if loaded in editor
             base.OnStart(state);
 
-
+            // init
             Debug.Log("[GN] GN_Base_System OnStart called.");
             VisualInit();
             PhysicsInit();
@@ -378,19 +378,6 @@ namespace GNTechnology
             //ApplyCondenserEmission(c);
         }
 
-        private void ApplyCondenserEmission(Color c)
-        {
-            const string emissiveProp = "_EmissiveColor"; // プロジェクトのプロパティ名に合わせて
-            foreach (var r in part.FindModelComponents<Renderer>())
-            {
-                if (!r) continue;
-                var mpb = new MaterialPropertyBlock();
-                r.GetPropertyBlock(mpb);
-                mpb.SetColor(emissiveProp, c);
-                r.SetPropertyBlock(mpb);
-            }
-        }
-
         private void MakeVisualState()
         {
             // default mode, this should be changed in derived classes.
@@ -584,7 +571,8 @@ namespace GNTechnology
             Y = Mathf.Abs(vessel.ctrlState.Y);
             Z = Mathf.Abs(vessel.ctrlState.Z);
             throttle = vessel.ctrlState.mainThrottle;
-            return (X + Y + Z + throttle) * accel / 5f; // AccelDiv;Calculate percentage of accel later!
+            //return (X + Y + Z + throttle) * accel / 5f; // AccelDiv;Calculate percentage of accel later!
+            return (X + Y + Z + throttle) * accel / MaxAccel;
         }
 
         protected void SetMaxG(float min, float max)
@@ -647,6 +635,9 @@ namespace GNTechnology
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
 
+            // Unit Off when start.
+            GNVisuals.SetOff(vs);
+
             // Debug
             Debug.Log($"[GN] vs.Mode={vs.Mode}");
         }
@@ -696,6 +687,9 @@ namespace GNTechnology
             vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
+
+            // Unit Off when start.
+            GNVisuals.SetOff(vs);
 
             // Debug
             Debug.Log($"[GN] vs.Mode={vs.Mode}");
@@ -769,6 +763,9 @@ namespace GNTechnology
             // For Twin drive
             CompressIndividuality();
 
+            // Unit Off when start.
+            GNVisuals.SetOff(vs);
+
             // Debug
             Debug.Log($"[GN] vs.Mode={vs.Mode}");
         }
@@ -820,23 +817,6 @@ namespace GNTechnology
         private void CompressIndividuality()
         {
             DriveIndividuality *= 0.5f;
-        }
-
-        private Color ParticleColor()
-        {
-            // NPE check
-            float TDmax = (float)part.Resources["TopologicalDefects"].maxAmount;
-
-            // NPE avoid
-            if (TDmax == 0) return new Color(1f, 0f, 0.15f, 1f);
-
-            float TDnow = (float)part.Resources["TopologicalDefects"].amount;
-            float r = 1f - TDnow / TDmax;
-            float g = TDnow / TDmax;
-            float b = (40f * (1 - g) + 170f * g) / 255f;
-
-            // intermix
-            return new Color(r, g, b, 1f); // Red for condenser.
         }
     }
 
