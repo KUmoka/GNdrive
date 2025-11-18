@@ -92,11 +92,15 @@ namespace GNTechnology
         [KSPField(guiName = "Engine Status", guiActive = false, guiActiveEditor = false)]
         public string ESDisplay = "None";
 
-        // KSP field for Particle/EC Generation rate (Condenser = 0)
+        // KSP field for Specs (Particle/EC Generation rate (Condenser = 0))
         [KSPField(guiName = "Particle Generation", guiActive = true, guiActiveEditor = true, isPersistant = true)]
         public float ParticleGeneration = 0f;
         [KSPField(guiName = "ElectricCharge Generation", guiActive = false, guiActiveEditor = false, isPersistant = true)]
         public double ECGeneration = 0f;
+        [KSPField(guiName = "MoveDistance", guiActive = false, guiActiveEditor = false, isPersistant = true)]
+        public float MoveDistance = 0f;
+        [KSPField(guiName = "Open Mode", guiActive = false, guiActiveEditor = false, isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
+        public bool MoveOn = false;
 
         // KSP field for drive individuality
         [KSPField(guiName = "Drive Individuality", guiActive = true, guiActiveEditor = true, isPersistant = true)]
@@ -264,6 +268,7 @@ namespace GNTechnology
         {
             vs.EngineState = engineOn;
             vs.InputLevel = InputLevel();
+            vs.MoveOn = MoveOn;
             GNVisuals.UpdateVisual(ref vs);
         }
 
@@ -391,6 +396,7 @@ namespace GNTechnology
             vs.MovingParts = listM.ToArray();
             // parts specific values
             vs.RotorSpeed = 60f; // condenser rotor speed
+            vs.MoveDistance = MoveDistance; // move distance in meters.
         }
 
         private void MakeList()
@@ -526,6 +532,7 @@ namespace GNTechnology
             Hide("ES");
             Hide("SyOn");
             Hide("sgOn");
+            Hide("MoveOn");
 
             Hide("ParticleGeneration");
             Hide("ECGeneration");
@@ -594,12 +601,6 @@ namespace GNTechnology
 
         protected void ESDisplayUpdate()
         {
-            //var desc = typeof(DriveState)
-            //    .GetField(ES.ToString())
-            //    .GetCustomAttributes(typeof(DescriptionAttribute), false)
-            //    .FirstOrDefault() as DescriptionAttribute;
-
-            //ESDisplay = desc?.Description ?? ES.ToString();
             ESDisplay = ES.ToString();
         }
     }
@@ -634,6 +635,7 @@ namespace GNTechnology
             vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
+            MoveOn = true; // Thruster always open.
 
             // Unit Off when start.
             GNVisuals.SetOff(vs);
@@ -838,7 +840,7 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("agOn", "hvOn","taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay"); // Always on Engine, Cannot turn off.
+                PAWActivate("agOn", "hvOn","taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay", "MoveOn"); // Always on Engine, Cannot turn off.
             }
             else
             {

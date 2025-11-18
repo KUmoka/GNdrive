@@ -17,6 +17,10 @@ namespace GNTechnology
         public float InputLevel; //from 0 to 1
         public float Smoothed; //from 0 to 1
         public float RotorSpeed; // rotor speed (degree per second)
+
+        //for move
+        public float MoveDistance; // max move distance for thruster parts.
+        public bool MoveOn; // true:move parts on, false:move parts off
         public bool EngineState; //true:engine on, false:engine off
 
         // Transforms and renderers
@@ -36,6 +40,8 @@ namespace GNTechnology
             InputLevel = 0f,
             Smoothed = 0f,
             RotorSpeed = 0,
+            MoveDistance = 0f,
+            MoveOn = false,
             EngineState = false,
 
             // Transforms and renderers
@@ -61,7 +67,7 @@ namespace GNTechnology
 
             // stop all visual effects
             UpdateRotor(vs.Rotors, 0f,0f); // no rotation
-            UpdateMove(vs.MovingParts,0f);
+            UpdateMove(vs.MovingParts,0f, 0f);
             UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, 0f, out smoothed);
             if (vs.ParticleEmitters != null)//no emitters = condenser.
             {
@@ -85,7 +91,7 @@ namespace GNTechnology
             float smoothed;// for smoothed rotation.
 
             UpdateRotor(vs.Rotors, 0f, 0f); // no rotation
-            UpdateMove(vs.MovingParts, level);
+            UpdateMove(vs.MovingParts, level, vs.MoveDistance);
             UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed); // Condenser glow
             UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, 0f); // no particle emission
         }
@@ -123,7 +129,7 @@ namespace GNTechnology
                 var lv = Mathf.Lerp(0.1f, 1f, Mathf.Clamp01(vs.InputLevel));
 
                 // if brake, less particle emission and light.
-                if (brakes && speed < 0.05) lv = 0.1f;
+                if (brakes && speed < 0.05) lv = 0.1f;/////
 
                 // normal update
                 UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed);
@@ -138,7 +144,8 @@ namespace GNTechnology
                 if (brakes && speed < 0.05 && (vs.Mode == GNVisualMode.Drive)) level = 0.1f;
 
                 // normal update
-                UpdateMove(vs.MovingParts, level); // Moving parts
+                if (vs.MoveOn) UpdateMove(vs.MovingParts, level, vs.MoveDistance);
+                else UpdateMove(vs.MovingParts, 0f, vs.MoveDistance); // Moving parts
                 UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed);
                 if (vs.Mode != GNVisualMode.Condenser) UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, level);
             }
@@ -161,11 +168,11 @@ namespace GNTechnology
             return (float)(res.amount / res.maxAmount);
         }
 
-        private static void UpdateMove(Transform[] MoveObjects, float level)// Move Thruster Parts if needed.
+        private static void UpdateMove(Transform[] MoveObjects, float level, float dist)// Move Thruster Parts if needed.
         {
             if (MoveObjects == null) return;
 
-            float maxOffset = 0.4f;
+            float maxOffset = dist;
             float targetY = -1 * Mathf.Clamp01(level) * maxOffset;  // 目標位置
             float speed = StepBase;                  // m/s など
             float step = speed * Time.deltaTime; // フレーム依存を解決
