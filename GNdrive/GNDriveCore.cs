@@ -101,6 +101,8 @@ namespace GNTechnology
         public float MoveDistance = 0f;
         [KSPField(guiName = "Open Mode", guiActive = false, guiActiveEditor = false, isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
         public bool MoveOn = false;
+        [KSPField(guiName = "IsMove", guiActive = false, guiActiveEditor = false, isPersistant = false)] // internal use, used for MovingParts control.
+        public bool IsMove = false;
 
         // KSP field for drive individuality
         [KSPField(guiName = "Drive Individuality", guiActive = true, guiActiveEditor = true, isPersistant = true)]
@@ -414,7 +416,10 @@ namespace GNTechnology
                 if (t.name.Contains("rotor") && t.GetComponentInParent<Part>() == this.part)
                     listT.Add(t);// Rotating parts
                 if (t.name.Contains("_Move") && t.GetComponentInParent<Part>() == this.part)
+                {
                     listM.Add(t);// Moving Parts
+                    IsMove = true;
+                }
             }
 
             var allL = part.transform.GetComponentsInChildren<Light>(true);
@@ -839,7 +844,9 @@ namespace GNTechnology
 
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("agOn", "hvOn","taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay", "MoveOn"); // Always on Engine, Cannot turn off.
+                PAWActivate("agOn", "hvOn","taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay"); // Always on Engine, Cannot turn off.
+                if(IsMove)
+                    PAWActivate("MoveOn");
             }
             else
             {

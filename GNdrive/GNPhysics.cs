@@ -173,19 +173,8 @@ namespace GNTechnology
             double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime; //now include hover consumption.
             TotalParticlePower *= TimeWarp.fixedDeltaTime; // compensation for consumption
 
-            // limit factor calculation
-            // 0..1想定,When particle generation on, drive power should suppress sustainable level
+            // limit factor calculation. When particle generation on, drive power should suppress sustainable level
             if (consumption > 0 && consumption > TotalParticlePower && ps.SafeGuard) limitFactor = (float)((TotalParticlePower) / consumption);
-            if (ps.part.Resources["GNparticle"].amount < 1)
-            {
-                Debug.Log("GNparticle less than 1");
-                limitFactor = 0f; // No Particle -> power off
-                ps.EngineState = false; // also turn off engine state,
-                ps.TaOn = false; // TRANS-AM off
-                ps.AgOn = false; // AG off
-                ps.HvOn = false; // hover off
-                return;
-            }
 
             // --- Force application ---
             foreach (Part p2 in vessel.parts)
@@ -223,6 +212,17 @@ namespace GNTechnology
 
             // apply consumption
             ps.part.RequestResource("GNparticle", consumption * limitFactor);
+
+            // --- Engine shut-off check ---
+            if (ps.part.Resources["GNparticle"].amount < 1)
+            {
+                Debug.Log("GNparticle less than 1");
+                ps.EngineState = false; // also turn off engine state,
+                ps.TaOn = false; // TRANS-AM off
+                ps.AgOn = false; // AG off
+                ps.HvOn = false; // hover off
+                return;
+            }
         }
 
         static float _hoverLastA = 0f;      // Previous accel rate [m/s^2]（for through rate）
