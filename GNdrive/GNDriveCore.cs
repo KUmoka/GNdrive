@@ -380,7 +380,6 @@ namespace GNTechnology
             var c = useAverageColor ? ag.AvgColor : ag.SumColor;
 
             vs.ParticleColor = (vs.ParticleColor == Color.black) ? new Color(0f, 1f, 170f / 255f, 1f) : c;
-            //ApplyCondenserEmission(c);
         }
 
         private void MakeVisualState()

@@ -292,7 +292,6 @@ namespace GNTechnology
             }
         }
 
-        private static bool ApproximatelyRGB(Color a, Color b, float eps = 1e-3f) => Mathf.Abs(a.r - b.r) < eps && Mathf.Abs(a.g - b.g) < eps && Mathf.Abs(a.b - b.b) < eps;
         private static readonly int TintId = Shader.PropertyToID("_TintColor");
         private static readonly int ColorId = Shader.PropertyToID("_Color");
 
@@ -302,26 +301,7 @@ namespace GNTechnology
 
             var ps = e.GetComponent<ParticleSystem>();
             if (ps == null) return; // no particle system -> return
-
-            // 既存色と同じならスキップ（startColor優先でチェック）
             var main = ps.main;
-            Color current = Color.magenta;
-            switch (main.startColor.mode)
-            {
-                case ParticleSystemGradientMode.Color: current = main.startColor.color; break;
-                case ParticleSystemGradientMode.TwoColors: current = main.startColor.colorMax; break;
-                case ParticleSystemGradientMode.Gradient:
-                case ParticleSystemGradientMode.TwoGradients:
-                    // gradientが有効なら最初のcolorKeyから推定
-                    var col = ps.colorOverLifetime;
-                    if (col.enabled && col.color.mode == ParticleSystemGradientMode.Gradient)
-                    {
-                        var g = col.color.gradient;
-                        if (g.colorKeys != null && g.colorKeys.Length > 0) current = g.colorKeys[0].color;
-                    }
-                    break;
-            }
-            if (ApproximatelyRGB(current, c)) return;
 
             // αは e.colorAnimation の [0],[2],[4] を使う（無ければデフォルト）
             float a0 = 1f, a2 = 0.35f, a4 = 0.02f;
