@@ -162,9 +162,6 @@ namespace GNTechnology
                 TotalParticlePower = TotalParticlePower + 2f * ps.ParticlePower * ps.SyncRate; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
             }
 
-            // Particle Generation furnace.no longer placed here.
-            // GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.fixedDeltaTime);
-
             // Resource drain calculation
             double mass = vessel.GetTotalMass(); // KSP1.12はdouble
 

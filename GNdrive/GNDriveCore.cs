@@ -167,8 +167,8 @@ namespace GNTechnology
         public override void OnFixedUpdate()
         {
             base.OnFixedUpdate();
+            PhysicsUpdate(); // Calc like TRANS-AM on/off judgement should be before particle generation.
             ParticleGenerationFixedUpdate();
-            PhysicsUpdate();
         }
 
         private void SystemInit()
