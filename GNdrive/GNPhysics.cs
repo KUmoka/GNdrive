@@ -164,7 +164,7 @@ namespace GNTechnology
             {
                 actualG *= 3f; //Increase actualG in TA mode
                 TotalParticlePower += 2f * ps.ParticlePower * ps.SyncRate; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
-                TotalParticleGenRate += 2f * ps.ParticleGenRate * ps.SyncRate;
+                //TotalParticleGenRate += 2f * ps.ParticleGenRate * ps.SyncRate;
             }
 
             // Resource drain calculation
