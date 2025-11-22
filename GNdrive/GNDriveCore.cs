@@ -308,6 +308,7 @@ namespace GNTechnology
             ps.MaxG = accel;
             ps.ParticleGenRate = ParticleGeneration;
             ps.ECOn = ECOn;
+            ps.SafeGuard = sgOn;
             GNPhysics.UpdatePhysics(ref ps);
             DriveStateReflection();
         }
@@ -639,6 +640,7 @@ namespace GNTechnology
             vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
+            sgOn = false;
             MoveOn = true; // Thruster always open.
 
             // Unit Off when start.
@@ -693,6 +695,7 @@ namespace GNTechnology
             vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
             ps.ParticlePower = particlepower;
             ps.MaxG = accel;
+            sgOn = false;
 
             // Unit Off when start.
             GNVisuals.SetOff(vs);
@@ -719,7 +722,6 @@ namespace GNTechnology
         public override void OnFixedUpdate()
         {
             base.OnFixedUpdate();
-            ps.SafeGuard = false;
         }
     }
 
@@ -862,6 +864,7 @@ namespace GNTechnology
             ps.ParticlePower = particlepower;
             ps.SafeGuard = false; // No need for safeguard for perpetual drive.
             ps.MaxG = accel;
+            sgOn = false;
 
             ps.SyncRate = 1f;
 

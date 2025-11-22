@@ -164,7 +164,6 @@ namespace GNTechnology
             {
                 actualG *= 3f; //Increase actualG in TA mode
                 TotalParticlePower += 2f * ps.ParticlePower * ps.SyncRate; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
-                //TotalParticleGenRate += 2f * ps.ParticleGenRate * ps.SyncRate;
             }
 
             // Resource drain calculation
@@ -186,6 +185,7 @@ namespace GNTechnology
             }
             else
             {
+                // Drive only, same as SafeGuard.on, but with thruster/condenser drive, limitFactor will increase.
                 if (consumption > 0 && consumption > TotalParticlePower) limitFactor = (float)(TotalParticlePower / (consumption * driveCount));
             }
 
