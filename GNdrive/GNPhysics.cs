@@ -70,6 +70,7 @@ namespace GNTechnology
             float z = -cs.Z;
             float actualG = ps.MaxG * 9.8f; // m/s^2
             float TotalParticlePower = 0f;
+            float TotalParticleGenRate = 0f;
             float limitFactor = 1f;
             float accelMag = 0f;
             int driveCount = 0, agCount = 0, hvCount = 0, taCount = 0;
@@ -129,6 +130,7 @@ namespace GNTechnology
                         if (t.ps.HvOn) hvCount++;
                         if (t.ps.TaOn) taCount++;
                         TotalParticlePower += t.ps.ParticlePower;
+                        if(t.ps.ECOn) TotalParticleGenRate += t.ps.ParticleGenRate;
                     }
                     else if (m is GNDriveSystem d && d.ps.EngineState)
                     {
@@ -137,6 +139,7 @@ namespace GNTechnology
                         if (d.ps.HvOn) hvCount++;
                         if (d.ps.TaOn) taCount++;
                         TotalParticlePower += d.ps.ParticlePower;
+                        TotalParticleGenRate += d.ps.ParticleGenRate;
                     }
                     else if (m is GNThrusterSystem s && s.ps.EngineState)
                     {
@@ -151,6 +154,7 @@ namespace GNTechnology
 
             // Sync Rate Bonus, add syncrate * particlepower, instead of particlepower
             TotalParticlePower += ps.ParticlePower * (ps.SyncRate - 1);
+            TotalParticleGenRate += ps.ParticleGenRate * (ps.SyncRate - 1);
 
             // hv > ag, disable ag when hv > 0
             if (hvCount > 0) ps.AgOn = false;
@@ -159,7 +163,8 @@ namespace GNTechnology
             if (ps.TaOn)
             {
                 actualG *= 3f; //Increase actualG in TA mode
-                TotalParticlePower = TotalParticlePower + 2f * ps.ParticlePower * ps.SyncRate; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
+                TotalParticlePower += 2f * ps.ParticlePower * ps.SyncRate; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
+                TotalParticleGenRate += 2f * ps.ParticleGenRate * ps.SyncRate;
             }
 
             // Resource drain calculation
@@ -172,12 +177,20 @@ namespace GNTechnology
             // consumption calculation
             double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime; //now include hover consumption.
             TotalParticlePower *= TimeWarp.fixedDeltaTime; // compensation for consumption
+            TotalParticleGenRate *= TimeWarp.fixedDeltaTime; // compensation for consumption
 
             // limit factor calculation. When particle generation on, drive power should suppress sustainable level
-            double ParticleAmount = ps.part.Resources["GNparticle"].amount;// needs to be changed to ship-wide particle amount later.
+            if (ps.SafeGuard)
+            {
+                if (consumption > 0 && consumption > TotalParticleGenRate) limitFactor = (float)(TotalParticleGenRate / (consumption * driveCount));
+            }
+            else
+            {
+                if (consumption > 0 && consumption > TotalParticlePower) limitFactor = (float)(TotalParticlePower / (consumption * driveCount));
+            }
 
-            if (consumption > 0 && consumption > TotalParticlePower && ps.SafeGuard) limitFactor = (float)((TotalParticlePower) / consumption); // L1, 0 < L1 < 1
-            if (consumption >= ParticleAmount) limitFactor = (float)(ParticleAmount / consumption); // L2, L1 > L2 >= 0 if there are not enough particles.
+            // consume particle
+            double actualConsumption = ps.part.RequestResource("GNparticle", consumption * limitFactor);
 
             // --- Force application ---
             foreach (Part p2 in vessel.parts)
@@ -212,9 +225,6 @@ namespace GNTechnology
                 // Calc force
                 p2.AddForce((brakes ? brakeDir * BrakeMag : ThrustDirection) * ThrustBudget * limitFactor * p2.rb.mass);
             }
-
-            // apply consumption
-            ps.part.RequestResource("GNparticle", consumption * limitFactor);
 
             // --- Engine shut-off check ---
             if (ps.part.Resources["GNparticle"].amount < 1)
