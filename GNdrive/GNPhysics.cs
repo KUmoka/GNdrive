@@ -174,7 +174,8 @@ namespace GNTechnology
             TotalParticlePower *= TimeWarp.fixedDeltaTime; // compensation for consumption
 
             // limit factor calculation. When particle generation on, drive power should suppress sustainable level
-            double ParticleAmount = ps.part.Resources["GNparticle"].amount;
+            double ParticleAmount = ps.part.Resources["GNparticle"].amount;// needs to be changed to ship-wide particle amount later.
+
             if (consumption > 0 && consumption > TotalParticlePower && ps.SafeGuard) limitFactor = (float)((TotalParticlePower) / consumption); // L1, 0 < L1 < 1
             if (consumption >= ParticleAmount) limitFactor = (float)(ParticleAmount / consumption); // L2, L1 > L2 >= 0 if there are not enough particles.
 
