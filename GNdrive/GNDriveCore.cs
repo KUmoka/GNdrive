@@ -140,7 +140,7 @@ namespace GNTechnology
             // Check if loaded in editor
             base.OnStart(state);
 
-            // init
+            // common component setup
             Debug.Log("[GN] GN_Base_System OnStart called.");
             VisualInit();
             PhysicsInit();
@@ -803,10 +803,12 @@ namespace GNTechnology
             if (Dep) ps.EngineState = false;
             if (part.Resources["GNparticle"].amount < 1)
             {
+                ps.GNdepleted = true;
                 ES = DriveState.Depleted;
             }
-            else if (part.Resources["GNparticle"].amount == part.Resources["GNparticle"].maxAmount && ES == DriveState.Depleted)
+            if (part.Resources["GNparticle"].amount == part.Resources["GNparticle"].maxAmount && ES == DriveState.Depleted)
             {
+                ps.GNdepleted = false;
                 ES = DriveState.Refilled;// now enable engine On.
             }
         }

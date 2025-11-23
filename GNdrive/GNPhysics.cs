@@ -25,6 +25,8 @@ namespace GNTechnology
         public float Individuality;
         public float SyncRate; // for Twin-drive
         public bool UnSync; // below twin drive sync rate, this = true.
+        public bool GNdepleted; // whether the EC is depleted.
+        public bool ECdepleted; // whether the EC is depleted.
 
         public static GNPhysicsState Empty => new GNPhysicsState
         {
@@ -39,7 +41,9 @@ namespace GNTechnology
             MaxG = 0f,
             Individuality = 0f,
             SyncRate = 1f,
-            UnSync = false
+            UnSync = false,
+            GNdepleted = false,
+            ECdepleted = false
         };
     }
 
@@ -181,12 +185,12 @@ namespace GNTechnology
             // limit factor calculation. When particle generation on, drive power should suppress sustainable level
             if (ps.SafeGuard)
             {
-                if (consumption > 0 && consumption > TotalParticleGenRate) limitFactor = (float)(TotalParticleGenRate / (consumption * driveCount));
+                if (consumption > 0 && consumption > TotalParticleGenRate) limitFactor = (float)(TotalParticleGenRate / consumption);
             }
             else
             {
                 // Drive only, same as SafeGuard.on, but with thruster/condenser drive, limitFactor will increase.
-                if (consumption > 0 && consumption > TotalParticlePower) limitFactor = (float)(TotalParticlePower / (consumption * driveCount));
+                if (consumption > 0 && consumption > TotalParticlePower) limitFactor = (float)(TotalParticlePower / consumption);
             }
 
             // consume particle
@@ -234,6 +238,7 @@ namespace GNTechnology
                 ps.TaOn = false; // TRANS-AM off
                 ps.AgOn = false; // AG off
                 ps.HvOn = false; // hover off
+                ps.GNdepleted = true; // GN depleted
                 return;
             }
         }
@@ -281,6 +286,10 @@ namespace GNTechnology
             double ECReqGen = 0f;
             var TD = ps.part.Resources["TopologicalDefects"];
             double actualAdd = 0f;
+            double PartPowerThreshold = 0.5f;
+
+            // depletion check
+            if(ps.ECdepleted) return;
 
             // EC->GNP logic
             if (ps.ECOn)
@@ -299,9 +308,10 @@ namespace GNTechnology
                     var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen * (actualAdd / (-1 * GNGen)));
 
                     // Enough EC or not?
-                    if (Pulled <= 0.5 * dt)
+                    if (Pulled <= PartPowerThreshold) // dt * (1/ dt) = 1, so no need to multiply dt here.
                     {
                         ps.ECOn = false;
+                        ps.ECdepleted = true;
                         return;
                     }
                 }
