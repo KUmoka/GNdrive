@@ -547,8 +547,6 @@ namespace GNTechnology
                 if (!audioSource.isPlaying) audioSource.Play();
                 audioSource.volume = Mathf.Lerp(soundMinVolume, soundMaxVolume, vs.InputLevel);
                 audioSource.pitch = Mathf.Lerp(soundMinPitch, soundMaxPitch, vs.InputLevel);
-                //audioSource.volume = 1.0f;
-                //audioSource.pitch = 1.0f;
             }
             else
             {
