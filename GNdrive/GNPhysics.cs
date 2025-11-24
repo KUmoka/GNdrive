@@ -20,6 +20,7 @@ namespace GNTechnology
         public bool ECOn; // EC to particle converter.
         public bool SafeGuard; // limit drive power or not to prevent dry-up.
         public bool Shortage; // whether the GN particle is in shortage.
+        //public bool IsFirstUpdate; // whether this is the first update after SafeGuard + engine on.
         public float ParticlePower; // Max power of the drive can exert
         public float ParticleGenRate; // particle generation rate
         public float MaxG; // for max acceleration.
@@ -42,6 +43,7 @@ namespace GNTechnology
             ECOn = false,
             SafeGuard = true,
             Shortage = false,
+            //IsFirstUpdate = true,
             ParticlePower = 0f,
             ParticleGenRate = 0f,
             MaxG = 0f,
@@ -111,6 +113,9 @@ namespace GNTechnology
             float vVert = (float)vessel.verticalSpeed;// 縦速度（KSPなら vessel.verticalSpeed が地表基準の鉛直速度）
             float aMax = Mathf.Max(0f, ps.MaxG * 9.80665f);// ユーザー設定上限（例：MaxG[G] → [m/s^2]へ換算）ps.MaxG が 1=1G といった意味なら：
             float aHover = ps.HvOn ? ComputeHoverAccel(vVert, gLocal, Time.fixedDeltaTime, aMax) : 0f;// ホバー用の上向き必要加速度を1回だけ計算  
+
+            // FP error avoidance
+            double epsilon = 1e-2;
 
             // Break calculation.
             bool brakes = vessel.ActionGroups[KSPActionGroup.Brakes];
@@ -200,7 +205,10 @@ namespace GNTechnology
                 //if (pgdrive == 0) pgdrive = 1; // prevent div by 0
                 //if (consumption > 0 && consumption > TotalParticleGenRate) limitFactor = (float)(TotalParticleGenRate / (consumption * pgdrive));
 
-                if (consumption > 0 && ps.UsedGNParticle == 0f) limitFactor = (float)(ps.ParticleGenRate / consumption);
+                //if (ps.IsFirstUpdate)
+                //{
+                //    limitFactor = (float)(ps.ParticleGenRate / consumption);
+                //} 
                 if (consumption > 0 && consumption > ps.UsedGNParticle) limitFactor =(float)(ps.UsedGNParticle / consumption);
             }
             else
@@ -210,10 +218,14 @@ namespace GNTechnology
             }
 
             // consume particle
-            double actualConsumption = ps.part.RequestResource("GNparticle", consumption * limitFactor);
-            if (actualConsumption < consumption * limitFactor)
+            double consume = consumption * (double)limitFactor;
+            double actualConsumption = ps.part.RequestResource("GNparticle", consume);
+            if (actualConsumption < consume - epsilon)
             {
                 ps.Shortage = true;
+                ps.TaOn = false; // TRANS-AM off
+                Debug.Log("GNparticle Shortage: AC=" + actualConsumption);
+                Debug.Log("GNparticle Shortage: Con=" + consume + epsilon);
             }
             else
             {
@@ -221,7 +233,7 @@ namespace GNTechnology
             }
 
             // --- Engine shut-off check ---
-            if (actualConsumption < consumption * limitFactor * 0.01f) // not enough particle, 1% threshold, for floating point error margin. At this point, GN is empty because actual draw > planned draw * 0.01f
+            if (actualConsumption < consume * 0.001f) // not enough particle, 0.1% threshold, for floating point error margin. At this point, GN is empty because actual draw > planned draw * 0.01f
             {
                 Debug.Log("GNparticle Empty");
                 ps.EngineState = false; // also turn off engine state,
@@ -312,9 +324,9 @@ namespace GNTechnology
 
             // variables
             double ECReqGen = 0f;
+            double ErrorMargin = 0.01f;
             var TD = ps.part.Resources["TopologicalDefects"];
             double lack = (TD.maxAmount - 2 * TD.amount);   // TD shortage
-            double actualAdd = 0f;
             double GenRateDt = ps.ParticleGenRate * dt;
             bool isNotEnoughPower = false;
 
@@ -334,7 +346,7 @@ namespace GNTechnology
             }
 
             // EC not enough
-            if (Pulled < ECReqGen + 1) // for fp error margin
+            if (Pulled < ECReqGen + ErrorMargin) // for fp error margin
             {
                 GNGen *= (Pulled / ECReqGen); // scale down GN generation
                 isNotEnoughPower = true;
@@ -365,6 +377,7 @@ namespace GNTechnology
 
         private static void FurnaceCutOff(ref GNPhysicsState ps)
         {
+            Debug.Log("EC depleted during GN particle generation.");
             ps.ECOn = false;
             ps.ECdepleted = true;
         }

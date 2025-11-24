@@ -107,6 +107,8 @@ namespace GNTechnology
         // KSP field for drive individuality
         [KSPField(guiName = "Drive Individuality", guiActive = true, guiActiveEditor = true, isPersistant = true)]
         public float DriveIndividuality = -1f;
+        [KSPField(guiActiveEditor = false, guiActive = false, isPersistant = true, guiName = "Manufactured")]
+        public bool Manufactured = false;
 
         // Emissive Color Changer field
         [KSPField(guiActive = true, guiName = "Tau / GN Count")]
@@ -191,6 +193,7 @@ namespace GNTechnology
         {
             ps.part = part;
             ps.ParticlePower = 1f; // default nonzero negligible value. 
+            ps.UsedGNParticle = ps.ParticleGenRate; // initialize used particle rate.
         }
 
         private void StatusInit()// OnStart
@@ -263,18 +266,12 @@ namespace GNTechnology
             // Time Warp, particle generation continues in timewarp.
             if (vessel.packed)
                 GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.deltaTime);
-
-            // Aftercare
-            ECOn = ps.ECOn;
         }
 
         private void ParticleGenerationFixedUpdate()
         {
             ps.ECOn = ECOn;
             GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.fixedDeltaTime);
-
-            // Aftercare
-            ECOn = ps.ECOn;
         }
 
         private void PhysicsUpdate()
@@ -314,6 +311,7 @@ namespace GNTechnology
             agOn = ps.AgOn;
             taOn = ps.TaOn;
             hvOn = ps.HvOn;
+            ECOn = ps.ECOn;
             ECOn = ps.ECOn;
         }
 
@@ -587,6 +585,11 @@ namespace GNTechnology
             if (e != null) { e.minValue = min; e.maxValue = max; e.stepIncrement = step; }if (ps.SyncRate < 1) ps.UnSync = true;
             if (fl != null) { fl.minValue = min; fl.maxValue = max; fl.stepIncrement = step; }
         }
+
+        protected void CompressIndividuality(float rate)
+        {
+            DriveIndividuality *= rate;
+        }
     }
 
     public class GNThrusterSystem : GNBaseSystem // GN thrusters
@@ -708,6 +711,8 @@ namespace GNTechnology
     {
         [KSPField(guiName = "Max Particle Output", guiActive = true)]
         public float particlepower = 1200f;
+        [KSPField(guiName = "Manufacture Variance", guiActive = true)]
+        public float ManufactureVariance = 0.5f;
 
         private bool Dep;
 
@@ -748,7 +753,8 @@ namespace GNTechnology
             ps.MaxG = accel;
 
             // For Twin drive
-            CompressIndividuality();
+            if (!Manufactured) CompressIndividuality(ManufactureVariance);
+            Manufactured = true; // Mark as manufactured.
 
             // Unit Off when start.
             GNVisuals.SetOff(vs);
@@ -802,17 +808,14 @@ namespace GNTechnology
             if (ps.GNdepleted && part.Resources["GNparticle"].amount < part.Resources["GNparticle"].maxAmount) return true;
             return false;
         }
-
-        private void CompressIndividuality()
-        {
-            DriveIndividuality *= 0.5f;
-        }
     }
 
     public class GNDriveSystem : GNBaseSystem // GN Drive (Original)
     {
         [KSPField(guiName = "Max Particle Output", guiActive = true)]
         public float particlepower = 1000f;
+        [KSPField(guiName = "Manufacture Variance", guiActive = true)]
+        public float ManufactureVariance = 1f;
 
         public override void OnStart(StartState state)
         {
@@ -846,6 +849,10 @@ namespace GNTechnology
             ps.SafeGuard = false; // No need for safeguard for perpetual drive.
             ps.MaxG = accel;
             sgOn = false;
+
+            // For Twin drive
+            if (!Manufactured) CompressIndividuality(ManufactureVariance);
+            Manufactured = true; // Mark as manufactured.
 
             ps.SyncRate = 1f;
 
