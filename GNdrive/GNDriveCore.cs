@@ -64,6 +64,60 @@ namespace GNTechnology
         AudioClip soundClip;
         AudioSource audioSource;
 
+        // KSP Actions
+        [KSPAction("Toggle Engine")]
+        public void ToggleEngineAction(KSPActionParam param)
+        {
+            engineOn = !engineOn;
+        }
+        [KSPAction("Toggle Anti-Gravity")]
+        public void ToggleAgAction(KSPActionParam param)
+        {
+            agOn = !agOn;
+        }
+        [KSPAction("Toggle Hovering")]
+        public void ToggleHvAction(KSPActionParam param)
+        {
+            hvOn = !hvOn;
+        }
+        [KSPAction("Toggle TRANS-AM")]
+        public void ToggleTaAction(KSPActionParam param)
+        {
+            taOn = !taOn;
+        }
+        [KSPAction("Increase Max-G")]
+        public void IncreaseMaxGAction(KSPActionParam param)
+        {
+            accel += 0.1f;
+            accel = Mathf.Clamp(accel, 0f, MaxAccel);
+        }
+        [KSPAction("Decrease Max-G")]
+        public void DecreaseMaxGAction(KSPActionParam param)
+        {
+            accel -= 0.1f;
+            accel = Mathf.Clamp(accel, 0f, MaxAccel);
+        }
+        [KSPAction("Toggle Input Electric Charge")]
+        public void ToggleECAction(KSPActionParam param)
+        {
+            ECOn = !ECOn;
+        }
+        [KSPAction("Toggle Sustainable Thrust Limit")]
+        public void ToggleSgAction(KSPActionParam param)
+        {
+            sgOn = !sgOn;
+        }
+        [KSPAction("Toggle Synchronize Target Drive")]
+        public void ToggleSyAction(KSPActionParam param)
+        {
+            SyOn = !SyOn;
+        }
+        [KSPAction("Toggle OpenMode")]
+        public void ToggleMoveOn(KSPActionParam param)
+        {
+            MoveOn = !MoveOn;
+        }
+
         // KSP fields for engine control.
         [KSPField(guiActive = false, guiActiveEditor = false, guiName = "Engine State", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
         public bool engineOn = false;
@@ -141,10 +195,12 @@ namespace GNTechnology
 
             // common component setup, visuals
             Debug.Log("[GN] GN_Base_System OnStart called.");
+            Debug.Log("[GN] Visual initialized.");
             VisualInit();
             DecideColor();
 
             // common component setup, physics
+            Debug.Log("[GN] Physics initialized.");
             PhysicsInit();
             StatusInit();
             EnsureIndividuality();
@@ -184,6 +240,7 @@ namespace GNTechnology
             MakeList();
             MakeVisualState();// values will be overwritten in each drive modules.
             PAWInitialization();
+            ActionInitialization();
 
             // Works when in Editor, no visual effects.
             if (HighLogic.LoadedSceneIsEditor)  GNVisuals.SetOff(vs);
@@ -532,6 +589,35 @@ namespace GNTechnology
             // Tau only
             Hide("ECOn");
         }
+        private void ActionInitialization()
+        {
+            if (Fields == null) return;
+
+            void Hide(string name)
+            {
+                var Ac = Actions[name];
+                if (Ac != null)
+                {
+                    Ac.active = false;
+                }
+                else
+                {
+                    Debug.LogWarning($"[GN] KSPAction '{name}' not found (skipped).");
+                }
+            }
+
+            // Basic PAW flight & editor
+            Hide("ToggleEngineAction");
+            Hide("ToggleAgAction");
+            Hide("ToggleHvAction");
+            Hide("ToggleTaAction");
+            Hide("IncreaseMaxGAction");
+            Hide("DecreaseMaxGAction");
+            Hide("ToggleECAction");
+            Hide("ToggleSgAction");
+            Hide("ToggleSyAction");
+            Hide("ToggleMoveOn");
+        }
 
         protected void PAWActivate(params string[] fieldNames)
         {
@@ -555,6 +641,30 @@ namespace GNTechnology
                 {
                     Fields[name].guiActive = false;
                     Fields[name].guiActiveEditor = false;
+                }
+            }
+        }
+
+        protected void ActionDeactivate(params string[] names)
+        {
+            foreach (var name in names)
+            {
+                var a = Actions[name];
+                if (a != null)
+                {
+                    a.active = false;
+                }
+            }
+        }
+
+        protected void ActionActivate(params string[] names)
+        {
+            foreach (var name in names)
+            {
+                var a = Actions[name];
+                if (a != null)
+                {
+                    a.active = true;
                 }
             }
         }
@@ -608,6 +718,7 @@ namespace GNTechnology
             part.stagingIconAlwaysShown = true;
             part.stagingOn = true;
 
+            // PAW and Action setup
             if (HighLogic.LoadedSceneIsFlight)
             {
                 PAWActivate("engineOn", "accel", "ESDisplay");
@@ -616,6 +727,7 @@ namespace GNTechnology
             {
                 PAWActivate("accel");
             }
+            ActionActivate("ToggleEngineAction", "IncreaseMaxGAction", "DecreaseMaxGAction", "ToggleMoveOn");
 
             vs.Mode = GNVisualMode.Drive;
             vs.RotorSpeed = 180f; // thruster rotor speed
@@ -663,6 +775,7 @@ namespace GNTechnology
             part.stagingIconAlwaysShown = true;
             part.stagingOn = true;
 
+            // PAW and Action setup
             if (HighLogic.LoadedSceneIsFlight)
             {
                 PAWActivate("engineOn", "agOn", "hvOn", "accel", "ESDisplay");
@@ -671,6 +784,7 @@ namespace GNTechnology
             {
                 PAWActivate("accel");
             }
+            ActionActivate("ToggleEngineAction", "ToggleAgAction", "ToggleHvAction", "IncreaseMaxGAction", "DecreaseMaxGAction");
 
             vs.Mode = GNVisualMode.CondenserDrive;
             vs.RotorSpeed = 180f; // thruster rotor speed
@@ -727,6 +841,7 @@ namespace GNTechnology
             part.stagingIconAlwaysShown = true;
             part.stagingOn = true;
 
+            // PAW and Action setup
             if (HighLogic.LoadedSceneIsFlight)
             {
                 PAWActivate("agOn", "hvOn", "accel", "SyOn", "ECOn", "sgOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay");
@@ -736,6 +851,7 @@ namespace GNTechnology
                 }
                 else
                 {
+                    PAWDeactivate("engineOn");
                     engineOn = true;
                     ECOn = true;
                 }
@@ -744,6 +860,7 @@ namespace GNTechnology
             {
                 PAWActivate("accel", "SyOn", "sgOn", "ECOn", "DriveIndividuality", "ParticleGeneration");
             }
+            ActionActivate("ToggleEngineAction", "ToggleAgAction", "ToggleHvAction", "IncreaseMaxGAction", "DecreaseMaxGAction", "ToggleECAction", "ToggleSgAction", "ToggleSyAction");
 
             vs.Mode = GNVisualMode.Drive;
             vs.RotorSpeed = 180f; // thruster rotor speed
@@ -828,6 +945,7 @@ namespace GNTechnology
             part.stagingIconAlwaysShown = true;
             part.stagingOn = true;
 
+            // PAW and Action setup
             if (HighLogic.LoadedSceneIsFlight)
             {
                 PAWActivate("agOn", "hvOn","taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay"); // Always on Engine, Cannot turn off.
@@ -838,6 +956,8 @@ namespace GNTechnology
             {
                 PAWActivate("accel", "DriveIndividuality", "ParticleGeneration");
             }
+            ActionActivate("ToggleAgAction", "ToggleHvAction", "ToggleTaAction", "IncreaseMaxGAction", "DecreaseMaxGAction", "ToggleECAction", "ToggleSgAction", "ToggleSyAction");
+            if (IsMove) ActionActivate("ToggleMoveOn");
 
             vs.RotorSpeed = 180f; // thruster rotor speed
             engineOn = true; // GN Drive is always on.
