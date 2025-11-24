@@ -956,7 +956,7 @@ namespace GNTechnology
             {
                 PAWActivate("accel", "DriveIndividuality", "ParticleGeneration");
             }
-            ActionActivate("ToggleAgAction", "ToggleHvAction", "ToggleTaAction", "IncreaseMaxGAction", "DecreaseMaxGAction", "ToggleECAction", "ToggleSgAction", "ToggleSyAction");
+            ActionActivate("ToggleAgAction", "ToggleHvAction", "ToggleTaAction", "IncreaseMaxGAction", "DecreaseMaxGAction");
             if (IsMove) ActionActivate("ToggleMoveOn");
 
             vs.RotorSpeed = 180f; // thruster rotor speed
