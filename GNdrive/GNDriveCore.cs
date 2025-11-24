@@ -542,11 +542,34 @@ namespace GNTechnology
         {
             if (audioSource == null) return;
 
+            // base
+            float volume = audioSource.volume;
+            float pitch = audioSource.pitch;
+            float step = 1f * Time.deltaTime;
+            bool brake = false;
+            Vector3 vSrf = (Vector3)vessel.srf_velocity;
+            float speed = vSrf.magnitude;
+
+            // target
+            float tgtVolume = Mathf.Lerp(soundMinVolume, soundMaxVolume, vs.InputLevel);
+            float tgtPitch = Mathf.Lerp(soundMinPitch, soundMaxPitch, vs.InputLevel);
+            brake = vessel.ActionGroups[KSPActionGroup.Brakes];
+
+            // sound reduction when braking
+            if (brake && speed < 0.05f) // reduce sound when brakes are on, speed < 0.05m/s
+            {
+                tgtVolume = soundMinVolume;
+                tgtPitch = soundMinPitch;
+            }
+
+            // playsound
             if (shouldPlay)
             {
                 if (!audioSource.isPlaying) audioSource.Play();
-                audioSource.volume = Mathf.Lerp(soundMinVolume, soundMaxVolume, vs.InputLevel);
-                audioSource.pitch = Mathf.Lerp(soundMinPitch, soundMaxPitch, vs.InputLevel);
+                //audioSource.volume = Mathf.Lerp(soundMinVolume, soundMaxVolume, vs.InputLevel);
+                //audioSource.pitch = Mathf.Lerp(soundMinPitch, soundMaxPitch, vs.InputLevel);
+                audioSource.volume = Mathf.MoveTowards(volume, tgtVolume, step);
+                audioSource.pitch = Mathf.MoveTowards(pitch, tgtPitch, step);
             }
             else
             {
