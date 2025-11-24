@@ -174,6 +174,12 @@ namespace GNTechnology
         [KSPField(guiActiveEditor = true, guiActive = true, isPersistant = true, guiName = "Synchronize Rate")]
         public float SynchronizeRate = 0f;
 
+        // sound
+        private float soundMinVolume = 0.2f;
+        private float soundMaxVolume = 0.6f;
+        private float soundMinPitch = 0.4f;
+        private float soundMaxPitch = 1.0f;
+
         public override void OnAwake()
         {
             base.OnAwake();
@@ -539,8 +545,10 @@ namespace GNTechnology
             if (shouldPlay)
             {
                 if (!audioSource.isPlaying) audioSource.Play();
-                audioSource.volume = 1.0f;
-                audioSource.pitch = 1.0f;
+                audioSource.volume = Mathf.Lerp(soundMinVolume, soundMaxVolume, vs.InputLevel);
+                audioSource.pitch = Mathf.Lerp(soundMinPitch, soundMaxPitch, vs.InputLevel);
+                //audioSource.volume = 1.0f;
+                //audioSource.pitch = 1.0f;
             }
             else
             {
