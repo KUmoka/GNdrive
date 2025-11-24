@@ -5,11 +5,13 @@ using System.Linq;
 using System.Security.Principal;
 using UnityEngine;
 using UnityEngine.Scripting;
+using static FinePrint.ContractDefs;
 
 namespace GNTechnology
 {
     public struct GNPhysicsState
     {
+        // Basic drive parameter
         public Part part; // the part that module attached on.
         public bool EngineState; // Engine on/off.
         public bool AgOn; // Anti-gravity
@@ -17,9 +19,11 @@ namespace GNTechnology
         public bool TaOn; // TRANS-AM
         public bool ECOn; // EC to particle converter.
         public bool SafeGuard; // limit drive power or not to prevent dry-up.
+        public bool Shortage; // whether the GN particle is in shortage.
         public float ParticlePower; // Max power of the drive can exert
         public float ParticleGenRate; // particle generation rate
         public float MaxG; // for max acceleration.
+        public double UsedGNParticle; // amount of GN particle used in last update.
 
         //Twin drive parameter
         public float Individuality;
@@ -30,15 +34,20 @@ namespace GNTechnology
 
         public static GNPhysicsState Empty => new GNPhysicsState
         {
+            // Basic defaults
             EngineState = false,
             AgOn = false,
             HvOn = false,
             TaOn = false,
             ECOn = false,
             SafeGuard = true,
+            Shortage = false,
             ParticlePower = 0f,
             ParticleGenRate = 0f,
             MaxG = 0f,
+            UsedGNParticle = 0f,
+
+            // Twin drive defaults
             Individuality = 0f,
             SyncRate = 1f,
             UnSync = false,
@@ -77,9 +86,7 @@ namespace GNTechnology
             float TotalParticleGenRate = 0f;
             float limitFactor = 1f;
             float accelMag = 0f;
-            int driveCount = 0, agCount = 0, hvCount = 0, taCount = 0;
-            // double ECReqGen = 0f;
-            // double ecUsed = 0f;
+            int driveCount = 0, agCount = 0, hvCount = 0, taCount = 0, pgdrive = 0;
 
             // Normalize input vector
             float norm = Mathf.Sqrt(x * x + y * y + z * z);
@@ -134,7 +141,11 @@ namespace GNTechnology
                         if (t.ps.HvOn) hvCount++;
                         if (t.ps.TaOn) taCount++;
                         TotalParticlePower += t.ps.ParticlePower;
-                        if(t.ps.ECOn) TotalParticleGenRate += t.ps.ParticleGenRate;
+                        if (t.ps.ECOn)
+                        {
+                            TotalParticleGenRate += t.ps.ParticleGenRate;
+                            pgdrive++;
+                        } 
                     }
                     else if (m is GNDriveSystem d && d.ps.EngineState)
                     {
@@ -144,6 +155,7 @@ namespace GNTechnology
                         if (d.ps.TaOn) taCount++;
                         TotalParticlePower += d.ps.ParticlePower;
                         TotalParticleGenRate += d.ps.ParticleGenRate;
+                        pgdrive++;
                     }
                     else if (m is GNThrusterSystem s && s.ps.EngineState)
                     {
@@ -156,7 +168,7 @@ namespace GNTechnology
                 }
             }
 
-            // Sync Rate Bonus, add syncrate * particlepower, instead of particlepower
+            // Sync Rate Bonus calculation (for my drive, bonus is ps.SyncRate * ps.ParticleXXXXX, but particleXXXXX is already added above)
             TotalParticlePower += ps.ParticlePower * (ps.SyncRate - 1);
             TotalParticleGenRate += ps.ParticleGenRate * (ps.SyncRate - 1);
 
@@ -178,14 +190,18 @@ namespace GNTechnology
             accelMag = (brakes ? brakeDir.magnitude * BrakeMag : ThrustDirection.magnitude) * (actualG - support) + support; // m/s^2, ternary operator
 
             // consumption calculation
-            double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime; //now include hover consumption.
+            double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime; //now include hover consumption, 1G
             TotalParticlePower *= TimeWarp.fixedDeltaTime; // compensation for consumption
             TotalParticleGenRate *= TimeWarp.fixedDeltaTime; // compensation for consumption
 
             // limit factor calculation. When particle generation on, drive power should suppress sustainable level
             if (ps.SafeGuard)
             {
-                if (consumption > 0 && consumption > TotalParticleGenRate) limitFactor = (float)(TotalParticleGenRate / consumption);
+                //if (pgdrive == 0) pgdrive = 1; // prevent div by 0
+                //if (consumption > 0 && consumption > TotalParticleGenRate) limitFactor = (float)(TotalParticleGenRate / (consumption * pgdrive));
+
+                if (consumption > 0 && ps.UsedGNParticle == 0f) limitFactor = (float)(ps.ParticleGenRate / consumption);
+                if (consumption > 0 && consumption > ps.UsedGNParticle) limitFactor =(float)(ps.UsedGNParticle / consumption);
             }
             else
             {
@@ -195,6 +211,26 @@ namespace GNTechnology
 
             // consume particle
             double actualConsumption = ps.part.RequestResource("GNparticle", consumption * limitFactor);
+            if (actualConsumption < consumption * limitFactor)
+            {
+                ps.Shortage = true;
+            }
+            else
+            {
+                ps.Shortage = false;
+            }
+
+            // --- Engine shut-off check ---
+            if (actualConsumption < consumption * limitFactor * 0.01f) // not enough particle, 1% threshold, for floating point error margin. At this point, GN is empty because actual draw > planned draw * 0.01f
+            {
+                Debug.Log("GNparticle Empty");
+                ps.EngineState = false; // also turn off engine state,
+                ps.TaOn = false; // TRANS-AM off
+                ps.AgOn = false; // AG off
+                ps.HvOn = false; // hover off
+                ps.GNdepleted = true; // GN depleted
+                return;
+            }
 
             // --- Force application ---
             foreach (Part p2 in vessel.parts)
@@ -228,18 +264,6 @@ namespace GNTechnology
 
                 // Calc force
                 p2.AddForce((brakes ? brakeDir * BrakeMag : ThrustDirection) * ThrustBudget * limitFactor * p2.rb.mass);
-            }
-
-            // --- Engine shut-off check ---
-            if (ps.part.Resources["GNparticle"].amount < 1)
-            {
-                Debug.Log("GNparticle less than 1");
-                ps.EngineState = false; // also turn off engine state,
-                ps.TaOn = false; // TRANS-AM off
-                ps.AgOn = false; // AG off
-                ps.HvOn = false; // hover off
-                ps.GNdepleted = true; // GN depleted
-                return;
             }
         }
 
@@ -282,44 +306,67 @@ namespace GNTechnology
 
         public static void ParticleSupply(ref GNPhysicsState ps, double dt)
         {
+            // Basic Check
+            if (!ps.ECOn) return; // EC off -> no generation
+            if (ps.part == null) return; // No part -> no generation
+
             // variables
             double ECReqGen = 0f;
             var TD = ps.part.Resources["TopologicalDefects"];
+            double lack = (TD.maxAmount - 2 * TD.amount);   // TD shortage
             double actualAdd = 0f;
-            double PartPowerThreshold = 0.5f;
+            double GenRateDt = ps.ParticleGenRate * dt;
+            bool isNotEnoughPower = false;
 
-            // depletion check
-            if(ps.ECdepleted) return;
+            // GN and Tau
+            ECReqGen = GenRateDt * lack * difficulty; // EC required proportional to lack of TD
+            double GNGen = GenRateDt * ps.SyncRate;
+            if (GNGen == 0f ) return; // no generation needed.
 
-            // EC->GNP logic
-            if (ps.ECOn)
+            // EC drain
+            double Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen); // EC pulled here, if not enough EC, Pulled < ECReqGen
+
+            // EC empty, 1f threshold
+            if (Pulled <= 1f && ECReqGen > 0)
             {
-                // GN and Tau
-                ECReqGen = ps.ParticleGenRate * (TD.maxAmount - 2 * TD.amount) * difficulty * dt; // EC required proportional to lack of TD
-                double GNGen = ps.ParticleGenRate * ps.SyncRate * dt;
-
-                // Tau drive
-                actualAdd = ps.part.RequestResource("GNparticle", (double)(-1 * GNGen)); // particle added here.
-
-                // GNGen > 0, actualAdd < 0, almost particle full
-                if (actualAdd < 0 && TD.amount <= 0.5)
-                {
-                    // EC draw
-                    var Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen * (actualAdd / (-1 * GNGen)));
-
-                    // Enough EC or not?
-                    if (Pulled <= PartPowerThreshold) // dt * (1/ dt) = 1, so no need to multiply dt here.
-                    {
-                        ps.ECOn = false;
-                        ps.ECdepleted = true;
-                        return;
-                    }
-                }
-                else if (TD.amount > 0.5)// GN drive or GN drive Tau with TD, power-generation mode, ECReqGen < 0
-                {
-                    ps.part.RequestResource("ElectricCharge", ECReqGen);
-                }
+                FurnaceCutOff(ref ps);
+                return;
             }
+
+            // EC not enough
+            if (Pulled < ECReqGen + 1) // for fp error margin
+            {
+                GNGen *= (Pulled / ECReqGen); // scale down GN generation
+                isNotEnoughPower = true;
+            }
+
+            // GN Generation. particle added here. if not enough space, (Abs) actualAdd < GNGen
+            double Aadd = Math.Abs(ps.part.RequestResource("GNparticle", (double)(-1 * GNGen)));
+            ps.UsedGNParticle = GNGen; // store used GN particle
+            ps.ECdepleted = false; // can draw EC = not empty
+
+            // usual case
+            if (Aadd == GNGen) return; // No EC return needed.
+
+            // particle nearly full.
+            if (Aadd < GNGen) 
+            {
+                ps.part.RequestResource("ElectricCharge", ECReqGen * ((Aadd - GNGen) / GNGen)); //Return unused EC
+                return;
+            }
+
+            // Not enough but some GN generated case
+            if (isNotEnoughPower)
+            {
+                FurnaceCutOff(ref ps);
+                return;// Debug.Log("Not enough EC for GN generation.");
+            }
+        }
+
+        private static void FurnaceCutOff(ref GNPhysicsState ps)
+        {
+            ps.ECOn = false;
+            ps.ECdepleted = true;
         }
     }
 }

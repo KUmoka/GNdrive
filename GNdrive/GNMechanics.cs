@@ -158,6 +158,7 @@ namespace GNTechnology
             public bool LtaOn;
             public bool LhvOn;
             public bool LECOn;
+            public bool LSgOn;
             public float MaxG;
 
             public static OnOffList Empty => new OnOffList
@@ -167,6 +168,7 @@ namespace GNTechnology
                 LtaOn = false,
                 LhvOn = false,
                 LECOn = false,
+                LSgOn = false,
                 MaxG = 0f,
             };
 
@@ -180,13 +182,14 @@ namespace GNTechnology
                     && LtaOn == o.LtaOn
                     && LhvOn == o.LhvOn
                     && LECOn == o.LECOn
+                    && LSgOn == o.LSgOn
                     && Mathf.Approximately(MaxG, o.MaxG);
             }
 
             // ★ ハッシュ（Equalsとセット）
             public override int GetHashCode()
             {
-                return (LengineOn, LagOn, LtaOn, LhvOn, LECOn, MaxG).GetHashCode();
+                return (LengineOn, LagOn, LtaOn, LhvOn, LECOn, LSgOn, MaxG).GetHashCode();
             }
 
             // ★ == / != 演算子のオーバーロード
@@ -251,6 +254,7 @@ namespace GNTechnology
                     m.taOn = OnOffLst.LtaOn;
                     m.accel = OnOffLst.MaxG;
                     m.ECOn = OnOffLst.LECOn;
+                    m.sgOn = OnOffLst.LSgOn;
 
                     // List.add
                     deviationTau.Add(m.DriveIndividuality);
@@ -263,6 +267,7 @@ namespace GNTechnology
                 foreach (var m in gns)
                 {
                     if (!m.SyOn) continue;
+                    // engineOn, ECOn, SgOn are not used in GNDriveSystem
                     m.agOn = OnOffLst.LagOn;
                     m.hvOn = OnOffLst.LhvOn;
                     m.taOn = OnOffLst.LtaOn;

@@ -111,13 +111,10 @@ namespace GNTechnology
         // Emissive Color Changer field
         [KSPField(guiActive = true, guiName = "Tau / GN Count")]
         public string counts = "0 / 0";
-
         [KSPField(guiActiveEditor = true, guiActive = true, isPersistant = true, guiName = "Use Avg Color")]
         public bool useAverageColor = true;
-
         [KSPField(guiActiveEditor = true, guiActive = true, isPersistant = true, guiName = "Accel Divided")]
         public float AccelDiv = 1f;
-
         [KSPField(guiActiveEditor = true, guiActive = true, isPersistant = true, guiName = "Synchronize Rate")]
         public float SynchronizeRate = 0f;
 
@@ -140,45 +137,45 @@ namespace GNTechnology
             // Check if loaded in editor
             base.OnStart(state);
 
-            // common component setup
+            // common component setup, visuals
             Debug.Log("[GN] GN_Base_System OnStart called.");
             VisualInit();
+            DecideColor();
+
+            // common component setup, physics
             PhysicsInit();
             StatusInit();
             EnsureIndividuality();
-            DecideColor();
 
             // System Initialize
-            SystemInit();
-
+            part.force_activate(); // Keep part activated. 
             Debug.Log("[GN] SystemInit Completed.");
         }
 
         public override void OnUpdate()
         {
             base.OnUpdate();
+
+            // Common Update, visual, (sound)
             VisualUpdate();
-            StatusUpdate();
             UpdateDriveAudio(engineOn);// Update audio based on engine state.
             DecideColor();
+            ESDisplay = ES.ToString(); // update Engine State display
+
+            // Common Update, physics related status
+            StatusUpdate();
             SyncUpdate();
             ParticleGenerationUpdate();
-            ESDisplayUpdate(); // update Engine State display
         }
 
         public override void OnFixedUpdate()
         {
             base.OnFixedUpdate();
             PhysicsUpdate(); // Calc like TRANS-AM on/off judgement should be before particle generation.
-            ParticleGenerationFixedUpdate();
+            ParticleGenerationFixedUpdate();// last
         }
 
-        private void SystemInit()
-        {
-            part.force_activate(); // Keep part activated. 
-        }
-
-        private void VisualInit()
+        private void VisualInit() // OnStart
         {
             // Initialize part visual state and PAW state.
             SetupAudio();
@@ -187,27 +184,34 @@ namespace GNTechnology
             PAWInitialization();
 
             // Works when in Editor, no visual effects.
-            if (HighLogic.LoadedSceneIsEditor)
-            {
-                GNVisuals.SetOff(vs);
-            }
+            if (HighLogic.LoadedSceneIsEditor)  GNVisuals.SetOff(vs);
         }
 
-        private void PhysicsInit()
+        private void PhysicsInit()// OnStart
         {
-            if (HighLogic.LoadedSceneIsEditor)
-            {
-                return;
-            }
             ps.part = part;
             ps.ParticlePower = 1f; // default nonzero negligible value. 
         }
 
-        private void StatusInit()
+        private void StatusInit()// OnStart
         {
             // for debug only
             Fields["useAverageColor"].guiActive = false;
             Fields["useAverageColor"].guiActiveEditor = false;
+        }
+
+        private void EnsureIndividuality()// OnStart
+        {
+            if (DriveIndividuality >= 0f) return;    // Already decided -> return,
+            DriveIndividuality = GeneratePerPartValue(); // 0..1
+        }
+
+        private void VisualUpdate()
+        {
+            vs.EngineState = engineOn;
+            vs.InputLevel = InputLevel();
+            vs.MoveOn = MoveOn;
+            GNVisuals.UpdateVisual(ref vs);
         }
 
         private void SyncUpdate()
@@ -228,6 +232,7 @@ namespace GNTechnology
                 LtaOn = taOn,
                 LhvOn = hvOn,
                 LECOn = ECOn,
+                LSgOn = sgOn,
                 MaxG = accel
             };
 
@@ -258,20 +263,18 @@ namespace GNTechnology
             // Time Warp, particle generation continues in timewarp.
             if (vessel.packed)
                 GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.deltaTime);
+
+            // Aftercare
+            ECOn = ps.ECOn;
         }
 
         private void ParticleGenerationFixedUpdate()
         {
             ps.ECOn = ECOn;
             GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.fixedDeltaTime);
-        }
 
-        private void VisualUpdate()
-        {
-            vs.EngineState = engineOn;
-            vs.InputLevel = InputLevel();
-            vs.MoveOn = MoveOn;
-            GNVisuals.UpdateVisual(ref vs);
+            // Aftercare
+            ECOn = ps.ECOn;
         }
 
         private void PhysicsUpdate()
@@ -283,19 +286,10 @@ namespace GNTechnology
             }
 
             // Refilled is ready for active.
-            switch (ES)
+            if (engineOn)
             {
-                case DriveState.Unsynchronized:// drive works at low level
-                case DriveState.Activated: // drive functioning
-                    PhysicsUpdateSupport();
-                    break;
-
-                case DriveState.Depleted:
-                    engineOn = false;
-                    break;
-
-                default:
-                    break;
+                PhysicsUpdateSupport();
+                return;
             }
         }
 
@@ -337,11 +331,7 @@ namespace GNTechnology
             }
             
             // case Depleted.
-            if (ES == DriveState.Depleted)
-            {
-                ES = DriveState.Depleted;
-                return;
-            }
+            if (ES == DriveState.Depleted) return;
 
             // case Engine on by user
             if (engineOn)
@@ -352,12 +342,6 @@ namespace GNTechnology
             {
                 ES = DriveState.Deactivated;
             }
-        }
-
-        private void EnsureIndividuality()
-        {
-            if (DriveIndividuality >= 0f) return;    // Already decided -> return,
-            DriveIndividuality = GeneratePerPartValue(); // 0..1
         }
 
         private float GeneratePerPartValue()
@@ -603,11 +587,6 @@ namespace GNTechnology
             if (e != null) { e.minValue = min; e.maxValue = max; e.stepIncrement = step; }if (ps.SyncRate < 1) ps.UnSync = true;
             if (fl != null) { fl.minValue = min; fl.maxValue = max; fl.stepIncrement = step; }
         }
-
-        protected void ESDisplayUpdate()
-        {
-            ESDisplay = ES.ToString();
-        }
     }
 
     public class GNThrusterSystem : GNBaseSystem // GN thrusters
@@ -806,7 +785,7 @@ namespace GNTechnology
                 ps.GNdepleted = true;
                 ES = DriveState.Depleted;
             }
-            if (part.Resources["GNparticle"].amount == part.Resources["GNparticle"].maxAmount && ES == DriveState.Depleted)
+            if (part.Resources["GNparticle"].amount == part.Resources["GNparticle"].maxAmount && ps.GNdepleted)
             {
                 ps.GNdepleted = false;
                 ES = DriveState.Refilled;// now enable engine On.
@@ -820,7 +799,7 @@ namespace GNTechnology
 
         private bool EngineDepleted()
         {
-            if (ES == DriveState.Depleted && part.Resources["GNparticle"].amount < part.Resources["GNparticle"].maxAmount) return true;
+            if (ps.GNdepleted && part.Resources["GNparticle"].amount < part.Resources["GNparticle"].maxAmount) return true;
             return false;
         }
 
@@ -890,6 +869,7 @@ namespace GNTechnology
         {
             base.OnFixedUpdate();
             SyOn = true; // force sync
+            sgOn = ps.Shortage; // power drop when particle shortage.
 
             // GN drive needs TD for actual work.
             if (part.Resources["GNparticle"].amount > 0 || part.Resources["TopologicalDefects"].amount >= 0.5)
