@@ -212,7 +212,6 @@ namespace GNTechnology
             EnsureIndividuality();
 
             // System Initialize
-            part.force_activate(); // Keep part activated. 
             Debug.Log("[GN] SystemInit Completed.");
         }
 
@@ -736,6 +735,15 @@ namespace GNTechnology
         [KSPField(guiName = "Max Particle Output", guiActive = true)]
         public float particlepower = 200f;
 
+        public override void OnActive()
+        {
+            base.OnActive();
+
+            // for staging activation
+            engineOn = true;
+            part.force_activate();
+        }
+
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
@@ -793,11 +801,21 @@ namespace GNTechnology
         [KSPField(guiName = "Max Particle Output", guiActive = true)]
         public float particlepower = 800f;
 
+        public override void OnActive()
+        {
+            base.OnActive();
+
+            // for staging activation
+            engineOn = true;
+            part.force_activate();
+        }
+
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
 
             //Set accel
+            part.force_activate();
             SetMaxG(0f, MaxAccel);
 
             part.stagingIcon = "LIQUID_ENGINE";
@@ -859,12 +877,22 @@ namespace GNTechnology
 
         private bool Dep;
 
+        public override void OnActive()
+        {
+            base.OnActive();
+
+            // for staging activation
+            engineOn = true;
+            part.force_activate();
+        }
+
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
 
             // set accel
             SetMaxG(0f, MaxAccel);
+            
 
             part.stagingIcon = "LIQUID_ENGINE";
             part.stagingIconAlwaysShown = true;
@@ -963,6 +991,15 @@ namespace GNTechnology
         [KSPField(guiName = "Manufacture Variance", guiActive = true)]
         public float ManufactureVariance = 1f;
 
+        public override void OnActive()
+        {
+            base.OnActive();
+
+            // for staging activation
+            engineOn = true;
+            part.force_activate();
+        }
+
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
@@ -973,6 +1010,9 @@ namespace GNTechnology
             part.stagingIcon = "LIQUID_ENGINE";
             part.stagingIconAlwaysShown = true;
             part.stagingOn = true;
+
+            // force Activate, since GN Drive is always on.
+            part.force_activate();
 
             // PAW and Action setup
             if (HighLogic.LoadedSceneIsFlight)
