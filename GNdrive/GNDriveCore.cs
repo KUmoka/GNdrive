@@ -741,7 +741,6 @@ namespace GNTechnology
 
             // for staging activation
             engineOn = true;
-            part.force_activate();
         }
 
         public override void OnStart(StartState state)
@@ -751,6 +750,7 @@ namespace GNTechnology
             // set accel
             SetMaxG(0f, MaxAccel);
 
+            // for staging icon
             part.stagingIcon = "LIQUID_ENGINE";
             part.stagingIconAlwaysShown = true;
             part.stagingOn = true;
@@ -807,7 +807,6 @@ namespace GNTechnology
 
             // for staging activation
             engineOn = true;
-            part.force_activate();
         }
 
         public override void OnStart(StartState state)
@@ -815,9 +814,9 @@ namespace GNTechnology
             base.OnStart(state);
 
             //Set accel
-            part.force_activate();
             SetMaxG(0f, MaxAccel);
 
+            // for staging icon
             part.stagingIcon = "LIQUID_ENGINE";
             part.stagingIconAlwaysShown = true;
             part.stagingOn = true;
@@ -883,7 +882,6 @@ namespace GNTechnology
 
             // for staging activation
             engineOn = true;
-            part.force_activate();
         }
 
         public override void OnStart(StartState state)
@@ -892,8 +890,8 @@ namespace GNTechnology
 
             // set accel
             SetMaxG(0f, MaxAccel);
-            
 
+            // for staging icon
             part.stagingIcon = "LIQUID_ENGINE";
             part.stagingIconAlwaysShown = true;
             part.stagingOn = true;
@@ -997,7 +995,6 @@ namespace GNTechnology
 
             // for staging activation
             engineOn = true;
-            part.force_activate();
         }
 
         public override void OnStart(StartState state)

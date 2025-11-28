@@ -30,7 +30,6 @@ namespace GNTechnology
         public KSPParticleEmitter[] ParticleEmitters; //EMI (particle emitters)
         public Transform[] MovingParts; // for thrusters
 
-
         public static GNVisualState Empty => new GNVisualState
         {
             // Basic info
@@ -288,6 +287,9 @@ namespace GNTechnology
 
                 // particle coloring system
                 SetEmitterColor_PS(e, particleColor);
+
+                // particle dynamics system
+                SetEmitterDynamics_PS(e, level, e.gameObject.GetComponentInParent<Part>().vessel);
                 //DumpEmitter(e, "GN");
             }
         }
@@ -318,6 +320,68 @@ namespace GNTechnology
             g2.SetKeys(new[]{new GradientColorKey(new Color(c.r,c.g,c.b), 0f), new GradientColorKey(new Color(c.r,c.g,c.b), 1f)}, new[]{new GradientAlphaKey(a0, 0f), new GradientAlphaKey(a2, 0.5f), new GradientAlphaKey(a4, 1f)});
             colOL.color = new ParticleSystem.MinMaxGradient(g2);
         }
+
+        private static void SetEmitterDynamics_PS(KSPParticleEmitter e, float level, Vessel vessel)
+        {
+            if (!e) return; // prevents NRE
+
+            var ps = e.GetComponent<ParticleSystem>();
+            if (ps == null) return; // no particle system -> return
+            var main = ps.main;
+            float startSpeed = 45f;
+            float accelBase = 100f;
+
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+            main.startSpeed = startSpeed;    // 例：20f;
+
+            Vector3 vesselBackWorld = GetCombinedThrustVector(vessel, 1.0f);// -vessel.ReferenceTransform.up.normalized;
+            Vector3 vesselBackLocal = ps.transform.InverseTransformDirection(vesselBackWorld);
+            vesselBackLocal.Normalize();
+
+            var fol = ps.forceOverLifetime;
+            fol.enabled = true;
+            fol.space = ParticleSystemSimulationSpace.Local;
+
+            float accel = accelBase * level; // 例：50f * throttle
+
+            fol.x = new ParticleSystem.MinMaxCurve(vesselBackLocal.x * accel);
+            fol.y = new ParticleSystem.MinMaxCurve(vesselBackLocal.y * accel);
+            fol.z = new ParticleSystem.MinMaxCurve(vesselBackLocal.z * accel);
+
+        }
+
+        private static Vector3 GetCombinedThrustVector(Vessel v, float rcsInfluence = 1.0f)
+        {
+            if (v == null) return Vector3.zero;
+
+            var s = v.ctrlState;
+            Transform rt = v.ReferenceTransform;
+
+            // --- RCS入力方向（動かしたい方向） ---
+            Vector3 rcsDir =
+                rt.right * s.X +   // 左右
+                rt.forward * s.Y +   // 前後
+                rt.up * s.Z;    // 上下
+
+            // RCSは実推力方向は逆（粒子が流れる方向）
+            Vector3 rcsThrust = rcsDir * rcsInfluence;
+
+
+            // --- メイン推力方向（機体の後方）---
+            Vector3 mainThrustDir = -rt.up;  // forwardが前の機体なら rt.forward、上が前なら rt.up
+            float mainPower = s.mainThrottle;
+            Vector3 mainThrust = mainThrustDir * mainPower;
+
+
+            // --- 合成 ---
+            Vector3 thrustVector = mainThrust + rcsThrust;
+
+            if (thrustVector != Vector3.zero)
+                thrustVector.Normalize();
+
+            return thrustVector;
+        }
+
 
         private static void UpdateRotor(Transform[] rotors, float rotorspeed, float level)// rotate rotors, note that this sub itself doesn't depends on previous state.
         {
