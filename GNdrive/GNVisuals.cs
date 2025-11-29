@@ -2,7 +2,6 @@
 using System;
 using System.Linq;
 using UnityEngine;
-using static iT;
 
 namespace GNTechnology
 {
@@ -269,7 +268,10 @@ namespace GNTechnology
 
         private static void UpdateParticle(KSPParticleEmitter[] emitters, Color particleColor, float level, Vessel vessel)
         {
+            // initial check
             if (emitters == null) return;
+
+            // seettings
             float tMin = 7000f * level * level;
             float tMax = 9000f * level * level;
 
@@ -284,12 +286,14 @@ namespace GNTechnology
                 e.minEmission = (int)Mathf.Lerp(e.minEmission, tMin, 100f * Time.deltaTime); //10f for last
                 e.maxEmission = (int)Mathf.Lerp(e.maxEmission, tMax, 100f * Time.deltaTime);
                 e.localVelocity = new Vector3(0f, -1 * Mathf.Lerp(5f, 45f, level), 0f);
+                var ps = e.GetComponent<ParticleSystem>();
+                var keys = e.colorAnimation; // Color[5]
 
                 // particle coloring system
-                SetEmitterColor_PS(e, particleColor);
+                SetEmitterColor_PS(ps, particleColor, keys);
 
                 // particle dynamics system
-                SetEmitterDynamics_PS(e, level, vessel);
+                SetEmitterDynamics_PS(ps, level, vessel);
                 //DumpEmitter(e, "GN");
             }
         }
@@ -297,17 +301,17 @@ namespace GNTechnology
         private static readonly int TintId = Shader.PropertyToID("_TintColor");
         private static readonly int ColorId = Shader.PropertyToID("_Color");
 
-        private static void SetEmitterColor_PS(KSPParticleEmitter e, Color c)
+        private static void SetEmitterColor_PS(ParticleSystem ps, Color c, Color[] keys)//KSPParticleEmitter e
         {
-            if (!e) return; // prevents NRE
+            //if (!e) return; // prevents NRE
 
-            var ps = e.GetComponent<ParticleSystem>();
-            if (ps == null) return; // no particle system -> return
+            //var ps = e.GetComponent<ParticleSystem>();
+            //if (ps == null) return; // no particle system -> return
             var main = ps.main;
 
             // αは e.colorAnimation の [0],[2],[4] を使う（無ければデフォルト）
             float a0 = 1f, a2 = 0.35f, a4 = 0.02f;
-            var keys = e.colorAnimation; // Color[5]
+            //var keys = e.colorAnimation; // Color[5] 
             if (keys != null && keys.Length >= 5) { a0 = keys[0].a; a2 = keys[2].a; a4 = keys[4].a; }
 
             // startColor（出生色）と、Color Over Lifetime（全期間の色）を設定
@@ -321,12 +325,12 @@ namespace GNTechnology
             colOL.color = new ParticleSystem.MinMaxGradient(g2);
         }
 
-        private static void SetEmitterDynamics_PS(KSPParticleEmitter e, float level, Vessel vessel)
+        private static void SetEmitterDynamics_PS(ParticleSystem ps, float level, Vessel vessel) //KSPParticleEmitter e
         {
-            if (!e) return; // prevents NRE
+            //if (!e) return; // prevents NRE
 
-            var ps = e.GetComponent<ParticleSystem>();
-            if (ps == null) return; // no particle system -> return
+            //var ps = e.GetComponent<ParticleSystem>();
+            //if (ps == null) return; // no particle system -> return
             var main = ps.main;
             float startSpeed = 45f;
             float accelBase = 100f;
