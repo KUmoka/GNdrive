@@ -92,7 +92,7 @@ namespace GNTechnology
             UpdateRotor(vs.Rotors, 0f, 0f); // no rotation
             UpdateMove(vs.MovingParts, level, vs.MoveDistance);
             UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed); // Condenser glow
-            UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, 0f); // no particle emission
+            UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, 0f, vs.part.vessel); // no particle emission
         }
 
         public static void UpdateVisual(ref GNVisualState vs)
@@ -132,7 +132,7 @@ namespace GNTechnology
 
                 // normal update
                 UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed);
-                UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, lv);
+                UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, lv, vessel);
 
                 // smoothed should be determined by previous step smoothed and step.
                 smoothed = Mathf.MoveTowards(vs.Smoothed, lv, step);
@@ -146,7 +146,7 @@ namespace GNTechnology
                 if (vs.MoveOn) UpdateMove(vs.MovingParts, level, vs.MoveDistance);
                 else UpdateMove(vs.MovingParts, 0f, vs.MoveDistance); // Moving parts
                 UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed);
-                if (vs.Mode != GNVisualMode.Condenser) UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, level);
+                if (vs.Mode != GNVisualMode.Condenser) UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, level, vessel);
             }
 
             // use modified level
@@ -267,7 +267,7 @@ namespace GNTechnology
             }
         }
 
-        private static void UpdateParticle(KSPParticleEmitter[] emitters, Color particleColor, float level)
+        private static void UpdateParticle(KSPParticleEmitter[] emitters, Color particleColor, float level, Vessel vessel)
         {
             if (emitters == null) return;
             float tMin = 7000f * level * level;
@@ -289,7 +289,7 @@ namespace GNTechnology
                 SetEmitterColor_PS(e, particleColor);
 
                 // particle dynamics system
-                SetEmitterDynamics_PS(e, level, e.gameObject.GetComponentInParent<Part>().vessel);
+                SetEmitterDynamics_PS(e, level, vessel);
                 //DumpEmitter(e, "GN");
             }
         }
