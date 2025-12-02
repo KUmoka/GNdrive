@@ -80,7 +80,6 @@ namespace GNTechnology
             // === renderer（最低限） ===
             var renderer = ps.GetComponent<ParticleSystemRenderer>();
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
-            // TODO: 必要ならここで Shader / Material をセットする
 
             // === noise ===
             var noise = ps.noise;
@@ -92,7 +91,7 @@ namespace GNTechnology
             // ここでは再生しない。呼び出し側で ps.Play() してね！
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
-            Debug.Log("[GN] Spherical shell emitter created on part: " + part.partInfo?.name);
+            //Debug.Log("[GN] Spherical shell emitter created on part: " + part.partInfo?.name);
 
             return ps;
         }
@@ -138,8 +137,6 @@ namespace GNTechnology
 
             // Billboard（看板型）にするならここ
             rend.renderMode = ParticleSystemRenderMode.Billboard;
-
-            Debug.Log("[GN] Texture applied: " + texturePathRelative);
         }
 
         public static void SetParticleStartColor(ParticleSystem ps, Color color)
@@ -151,7 +148,6 @@ namespace GNTechnology
             }
             var main = ps.main;
             main.startColor = color;
-            Debug.Log("[GN] Particle start color set to: " + color.ToString());
         }
 
         public static void SetPSPosition(ParticleSystem ps, Part part, Vessel vessel)
@@ -162,7 +158,6 @@ namespace GNTechnology
                 return;
             }
             ps.transform.localPosition = part.transform.InverseTransformPoint(vessel.CoM);
-            Debug.Log("[GN] ParticleSystem position set to: " + ps.transform.position.ToString());
         }
 
         public static float GetMaxVesselRadiusFromCoM(Vessel vessel)
@@ -252,12 +247,30 @@ namespace GNTechnology
         [KSPField(guiActive = false, guiName = "TexturePath")]
         public string texPath = "";
 
+        // For vessel Module to notify ship changes
+        public bool IsShipChanged = false;
+
+        // Constants.
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "Field Offset", isPersistant = true), UI_FloatRange(minValue = -10f, maxValue = 10f, stepIncrement = 0.1f)]
+        private float radiousOffset = 1f;
+
+        // Fresnel Sphere variables
+        private string ShaderType = "KSP/Particles/Alpha Blended";
+        private GameObject fresnelSphere;
+        private Mesh fresnelMesh;
+        private Vector3[] baseVerts;
+        private Vector3[] baseNormals;
+        private Color[] vertColors;
+        public Color fresnelColor = new Color(0f, 1f, 170f / 255f, 1f);
+        public float fresnelAlphaScale = 1.0f;
+        public float fresnelPower = 2.0f;
+
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
 
             // radious initialization
-            myradius = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel) + 1f; // +1mの余裕を持たせる
+            myradius = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel) + radiousOffset; // Too large, offset.
 
             // とりあえず半径3m、毎秒200粒子くらいで試す
             spherePs = GNTechnology.GNParticleHelpers.CreateSphericalShellEmitter(
@@ -272,7 +285,7 @@ namespace GNTechnology
                 worldSpace: true   // とりあえずWorld空間で様子を見る
             );
 
-            if(texPath == "")
+            if (texPath == "")
             {
                 Debug.LogWarning("[GN] Texture path is empty.");
                 return;
@@ -282,11 +295,44 @@ namespace GNTechnology
             GNParticleHelpers.SetParticleTexture(spherePs, texPath);
             GNParticleHelpers.SetParticleStartColor(spherePs, new Color(0f, 1f, 170f / 255f, 1f));
             GNParticleHelpers.SetPSPosition(spherePs, part, part.vessel);
+
+            // Fresnel Sphere Create
+            SphereFieldCreate();
         }
 
         public override void OnUpdate()
         {
             base.OnUpdate();
+
+            // Particle System Update
+            FieldUpdate();
+
+            // Fresnel Sphere Update
+            SphereFieldUpdate(); // Activate/Deactivate and scale update
+            UpdateFresnelSphere(); // Vertex color update
+
+            // Ship Change Check
+            if (IsShipChanged)
+            {
+                myradius = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel) + radiousOffset;
+                IsShipChanged = false;
+            }
+
+
+        }
+
+        public override void OnInactive()
+        {
+            base.OnInactive();
+            // 片付け（お好みで）
+            if (spherePs != null)
+            {
+                spherePs.Stop();
+            }
+        }
+
+        private void FieldUpdate()
+        {
             // パラメータ変更に追従させる
             if (spherePs != null)
             {
@@ -319,14 +365,108 @@ namespace GNTechnology
             }
         }
 
-        public override void OnInactive()
+        private void SphereFieldCreate()
         {
-            base.OnInactive();
-            // 片付け（お好みで）
-            if (spherePs != null)
+            // 球メッシュを作成
+            fresnelSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            fresnelSphere.name = "GN_FresnelSphere";
+            fresnelSphere.transform.SetParent(part.transform, false);
+
+            // コライダーは不要なので削除
+            UnityEngine.Object.Destroy(fresnelSphere.GetComponent<Collider>());
+
+            // 半径 myradius に合わせてスケール（直径 = 2R）
+            float d = myradius * 2f;
+            fresnelSphere.transform.localScale = Vector3.one * d;
+
+            // メッシュをインスタンス化して頂点カラーを書き換え可能にする
+            var mf = fresnelSphere.GetComponent<MeshFilter>();
+            if (mf != null && mf.sharedMesh != null)
             {
-                spherePs.Stop();
+                fresnelMesh = UnityEngine.Object.Instantiate(mf.sharedMesh);
+                mf.mesh = fresnelMesh;
+
+                baseVerts = fresnelMesh.vertices;
+                baseNormals = fresnelMesh.normals;
+                vertColors = new Color[baseVerts.Length];
             }
+
+            // マテリアル設定（頂点カラーを使う透明シェーダ）
+            var mr = fresnelSphere.GetComponent<MeshRenderer>();
+            var shader = Shader.Find(ShaderType); // 透明&頂点カラー対応
+
+            Debug.Log("[GN] Fresnel shader lookup: " + (shader != null ? "Found" : "Not Found"));
+
+            if (shader != null)
+            {
+                Debug.Log("[GN] Fresnel shader found.");
+                var mat = new Material(shader);
+                mat.color = fresnelColor;   // RGB はここで制御、Alpha は頂点カラー
+                mr.material = mat;
+            }
+
+            // 最初はOFF
+            fresnelSphere.SetActive(false);
+        }
+
+        private void SphereFieldUpdate()
+        {
+            if (fresnelSphere != null && vessel != null)
+            {
+                fresnelSphere.SetActive(FieldON);
+                if (!FieldON) goto SkipFresnel; // ちょっと乱暴だけど雰囲気
+
+                // 半径変更に追従
+                float d = myradius * 2f;
+                fresnelSphere.transform.localScale = Vector3.one * d;
+
+                // CoM に追従
+                Vector3 worldCoM = vessel.CoM;
+                Vector3 localCoM = part.transform.InverseTransformPoint(worldCoM);
+                fresnelSphere.transform.localPosition = localCoM;
+
+                // 後で頂点カラー更新
+            }
+
+            SkipFresnel:;
+        }
+
+        private void UpdateFresnelSphere()
+        {
+            if (fresnelMesh == null || baseVerts == null || baseNormals == null) return;
+            if (vertColors == null || vertColors.Length != baseVerts.Length) return;
+
+            var fc = FlightCamera.fetch;
+            if (fc == null || fc.mainCamera == null) return;
+
+            var cam = fc.mainCamera;
+            var t = fresnelSphere.transform;
+
+            for (int i = 0; i < baseVerts.Length; i++)
+            {
+                // 頂点のワールド座標＆ワールド法線
+                Vector3 worldPos = t.TransformPoint(baseVerts[i]);
+                Vector3 worldNormal = t.TransformDirection(baseNormals[i]).normalized;
+
+                // カメラから頂点への視線方向
+                Vector3 viewDir = (cam.transform.position - worldPos).normalized;
+
+                // ndotv: N・V
+                //float ndotv = Mathf.Clamp01(Vector3.Dot(worldNormal, viewDir));
+                float ndotv = Mathf.Abs(Vector3.Dot(worldNormal, viewDir));
+
+                // フレネルっぽい係数: 正面 0, 縁 1
+                float fresnel = 1f - ndotv;
+                fresnel = Mathf.Pow(fresnel, fresnelPower);
+
+                // 頂点カラーに反映（RGBは一定、Alphaだけ変化）
+                vertColors[i].r = fresnelColor.r;
+                vertColors[i].g = fresnelColor.g;
+                vertColors[i].b = fresnelColor.b;
+                vertColors[i].a = fresnel * fresnelAlphaScale;
+            }
+
+            fresnelMesh.colors = vertColors;
         }
     }
 }
