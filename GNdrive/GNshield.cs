@@ -660,12 +660,12 @@ namespace GNTechnology
             target = FieldON ? 1.0f : 0.0f;
             FieldStrength = Mathf.MoveTowards(FieldStrength, target, step * Time.deltaTime);
 
+            // sphere on/off
+            fresnelSphere.SetActive(FieldStrength > 1e-5);
+
             // update sphere
             if (FieldStrength > 1e-5)
             {
-                // sphere on
-                fresnelSphere.SetActive(FieldStrength > 1e-5);
-
                 // 半径変更に追従
                 float d = myradius * 2f;
                 fresnelSphere.transform.localScale = Vector3.one * d;
