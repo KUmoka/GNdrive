@@ -518,6 +518,9 @@ namespace GNTechnology
         private Color fresnelColor = new Color(0f, 1f, 170f / 255f, 1f);
         private float fresnelAlphaScale = 0.9f;
         private float fresnelPower = 3.0f;
+        private float step = 5f;
+        private float FieldStrength = 0.0f;
+        private float target = 0.0f;
 
         // field specs
         private double drainRate = 10d; // units per second
@@ -653,12 +656,16 @@ namespace GNTechnology
                 GNParticleHelpers.SetPSPosition(spherePs, part, part.vessel);
             }
 
-            // sphere on
-            fresnelSphere.SetActive(FieldON);
+            // fiueld calculation
+            target = FieldON ? 1.0f : 0.0f;
+            FieldStrength = Mathf.MoveTowards(FieldStrength, target, step * Time.deltaTime);
 
             // update sphere
-            if (FieldON)
+            if (FieldStrength > 1e-5)
             {
+                // sphere on
+                fresnelSphere.SetActive(FieldStrength > 1e-5);
+
                 // 半径変更に追従
                 float d = myradius * 2f;
                 fresnelSphere.transform.localScale = Vector3.one * d;
@@ -669,7 +676,6 @@ namespace GNTechnology
                 fresnelSphere.transform.localPosition = localCoM;
 
                 var fc = FlightCamera.fetch;
-
                 var cam = fc.mainCamera;
                 var t = fresnelSphere.transform;
 
@@ -693,9 +699,8 @@ namespace GNTechnology
                     vertColors[i].r = fresnelColor.r;
                     vertColors[i].g = fresnelColor.g;
                     vertColors[i].b = fresnelColor.b;
-                    vertColors[i].a = fresnel * fresnelAlphaScale;
+                    vertColors[i].a = fresnel * fresnelAlphaScale * FieldStrength;
                 }
-
                 fresnelMesh.colors = vertColors;
             }
         }
