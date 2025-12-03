@@ -327,6 +327,7 @@ namespace GNTechnology
 
             // Time Warp, particle generation continues in timewarp.
             if (vessel.packed)
+                ps.ECOn = ECOn;
                 GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.deltaTime);
         }
 

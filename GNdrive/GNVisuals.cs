@@ -303,10 +303,6 @@ namespace GNTechnology
 
         private static void SetEmitterColor_PS(ParticleSystem ps, Color c, Color[] keys)//KSPParticleEmitter e
         {
-            //if (!e) return; // prevents NRE
-
-            //var ps = e.GetComponent<ParticleSystem>();
-            //if (ps == null) return; // no particle system -> return
             var main = ps.main;
 
             // αは e.colorAnimation の [0],[2],[4] を使う（無ければデフォルト）
@@ -327,10 +323,6 @@ namespace GNTechnology
 
         private static void SetEmitterDynamics_PS(ParticleSystem ps, float level, Vessel vessel) //KSPParticleEmitter e
         {
-            //if (!e) return; // prevents NRE
-
-            //var ps = e.GetComponent<ParticleSystem>();
-            //if (ps == null) return; // no particle system -> return
             var main = ps.main;
             float startSpeed = 45f;
             float accelBase = 100f;

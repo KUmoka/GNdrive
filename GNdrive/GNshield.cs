@@ -91,8 +91,6 @@ namespace GNTechnology
             // ここでは再生しない。呼び出し側で ps.Play() してね！
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
-            //Debug.Log("[GN] Spherical shell emitter created on part: " + part.partInfo?.name);
-
             return ps;
         }
 
@@ -224,6 +222,10 @@ namespace GNTechnology
 
             return maxDistance;
         }
+
+
+
+
     }
 
     public class GNTestSphereFX : PartModule
@@ -251,8 +253,9 @@ namespace GNTechnology
         public bool IsShipChanged = false;
 
         // Constants.
-        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "Field Offset", isPersistant = true), UI_FloatRange(minValue = -10f, maxValue = 10f, stepIncrement = 0.1f)]
-        private float radiousOffset = 1f;
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "Field Offset", isPersistant = true), UI_FloatRange(minValue = -10f, maxValue = 10f, stepIncrement = 0.5f)]
+        public float radiousOffset = 1f;
+        private float myRadiousWithOutOffset = 0f;
 
         // Fresnel Sphere variables
         private string ShaderType = "KSP/Particles/Alpha Blended";
@@ -262,15 +265,23 @@ namespace GNTechnology
         private Vector3[] baseNormals;
         private Color[] vertColors;
         public Color fresnelColor = new Color(0f, 1f, 170f / 255f, 1f);
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "Fresnel Scale", isPersistant = true), UI_FloatRange(minValue = 0f, maxValue = 1f, stepIncrement = 0.05f)]
         public float fresnelAlphaScale = 1.0f;
-        public float fresnelPower = 2.0f;
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "Fresnel Power", isPersistant = true), UI_FloatRange(minValue = 1f, maxValue = 5f, stepIncrement = 1f)]
+        public float fresnelPower = 4.0f;
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "Fresnel Offset", isPersistant = true), UI_FloatRange(minValue = 1f, maxValue = 10f, stepIncrement = 1f)]
+        public float fresnelOffset = 1.0f;
 
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
 
+            // Particle Color Initialization
+            fresnelColor = part.Modules.GetModule<GNBaseSystem>()?.vs.ParticleColor ?? new Color(0f, 1f, 170f / 255f, 1f);
+
             // radious initialization
-            myradius = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel) + radiousOffset; // Too large, offset.
+            myRadiousWithOutOffset = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel); // Too large, offset.
+            myradius = myRadiousWithOutOffset + radiousOffset;
 
             // とりあえず半径3m、毎秒200粒子くらいで試す
             spherePs = GNTechnology.GNParticleHelpers.CreateSphericalShellEmitter(
@@ -293,7 +304,7 @@ namespace GNTechnology
 
             // テクスチャも設定してみる
             GNParticleHelpers.SetParticleTexture(spherePs, texPath);
-            GNParticleHelpers.SetParticleStartColor(spherePs, new Color(0f, 1f, 170f / 255f, 1f));
+            GNParticleHelpers.SetParticleStartColor(spherePs, fresnelColor);
             GNParticleHelpers.SetPSPosition(spherePs, part, part.vessel);
 
             // Fresnel Sphere Create
@@ -317,8 +328,6 @@ namespace GNTechnology
                 myradius = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel) + radiousOffset;
                 IsShipChanged = false;
             }
-
-
         }
 
         public override void OnInactive()
@@ -333,6 +342,9 @@ namespace GNTechnology
 
         private void FieldUpdate()
         {
+            // radious adjust.
+            myradius = myRadiousWithOutOffset + radiousOffset;
+
             // パラメータ変更に追従させる
             if (spherePs != null)
             {
@@ -424,8 +436,6 @@ namespace GNTechnology
                 Vector3 worldCoM = vessel.CoM;
                 Vector3 localCoM = part.transform.InverseTransformPoint(worldCoM);
                 fresnelSphere.transform.localPosition = localCoM;
-
-                // 後で頂点カラー更新
             }
 
             SkipFresnel:;
@@ -452,12 +462,17 @@ namespace GNTechnology
                 Vector3 viewDir = (cam.transform.position - worldPos).normalized;
 
                 // ndotv: N・V
-                //float ndotv = Mathf.Clamp01(Vector3.Dot(worldNormal, viewDir));
                 float ndotv = Mathf.Abs(Vector3.Dot(worldNormal, viewDir));
 
                 // フレネルっぽい係数: 正面 0, 縁 1
                 float fresnel = 1f - ndotv;
                 fresnel = Mathf.Pow(fresnel, fresnelPower);
+
+                //float p = fresnelOffset;
+                //float E = 1f / (p + 1f);
+                //float fresnel = ndotv * Mathf.Pow(1f - ndotv, p);
+                //fresnel *= 1f / (E * Mathf.Pow((1 - E), p));    
+                //fresnel = Mathf.Pow(fresnel, fresnelPower);
 
                 // 頂点カラーに反映（RGBは一定、Alphaだけ変化）
                 vertColors[i].r = fresnelColor.r;
@@ -467,6 +482,264 @@ namespace GNTechnology
             }
 
             fresnelMesh.colors = vertColors;
+        }
+    }
+
+    public class GNShieldModule : PartModule
+    {
+        // Particle System
+        private ParticleSystem spherePs;
+
+        private float myradius = 1f;
+        private float myRateOverTime = 10000f;
+        private float myStartSize = 0.5f;
+        private float myStartLifeTime = 0.4f;
+        private float myStartSpeed = 0f;
+        private float myThickness = 0.1f;
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "GNField", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
+        public bool FieldON = false;
+        [KSPField(guiActive = false, guiName = "TexturePath")]
+        public string texPath = "";
+
+        // For vessel Module to notify ship changes
+        public bool IsShipChanged = false;
+
+        // Constants.
+        private float radiousOffset = 1f;
+        private float myRadiousWithOutOffset = 0f;
+
+        // Fresnel Sphere variables
+        private string ShaderType = "KSP/Particles/Alpha Blended";
+        private GameObject fresnelSphere;
+        private Mesh fresnelMesh;
+        private Vector3[] baseVerts;
+        private Vector3[] baseNormals;
+        private Color[] vertColors;
+        private Color fresnelColor = new Color(0f, 1f, 170f / 255f, 1f);
+        private float fresnelAlphaScale = 0.9f;
+        private float fresnelPower = 3.0f;
+
+        // field specs
+        private double drainRate = 10d; // units per second
+        private double amountToDrain = 0d;
+        private double actualDrain = 0d;
+
+        public override void OnStart(StartState state)
+        {
+            base.OnStart(state);
+
+            // system activate
+            part.force_activate();
+
+            // Particle Color Initialization
+            fresnelColor = part.Modules.GetModule<GNBaseSystem>()?.vs.ParticleColor ?? new Color(0f, 1f, 170f / 255f, 1f);
+
+            // radious initialization
+            myRadiousWithOutOffset = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel); // Too large, offset.
+            myradius = myRadiousWithOutOffset + radiousOffset;
+
+            // とりあえず半径3m、毎秒200粒子くらいで試す
+            spherePs = GNTechnology.GNParticleHelpers.CreateSphericalShellEmitter(
+                part,
+                name: "GN_TestSphereEmitter",
+                radius: myradius,
+                rateOverTime: myRateOverTime,
+                startSize: myradius * 0.01f * myStartSize,
+                startLifetime: myStartLifeTime,
+                startSpeed: myStartSpeed,
+                thickness: myradius,
+                worldSpace: true   // とりあえずWorld空間で様子を見る
+            );
+
+            if (texPath == "")
+            {
+                Debug.LogWarning("[GN] Texture path is empty.");
+                return;
+            }
+
+            // テクスチャも設定してみる
+            GNParticleHelpers.SetParticleTexture(spherePs, texPath);
+            GNParticleHelpers.SetParticleStartColor(spherePs, fresnelColor);
+            GNParticleHelpers.SetPSPosition(spherePs, part, part.vessel);
+
+            // Fresnel Sphere Create
+            SphereFieldCreate();
+        }
+
+        public override void OnUpdate()
+        {
+            base.OnUpdate();
+
+            // Particle System and Fresnel Sphere Update
+            FieldUpdate();
+
+            // Ship Change Check
+            if (IsShipChanged)
+            {
+                myradius = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel) + radiousOffset;
+                IsShipChanged = false;
+            }
+
+            if (vessel.packed && FieldON)
+                ParticleDrainUpdate(TimeWarp.deltaTime);
+        }
+
+        public override void OnInactive()
+        {
+            base.OnInactive();
+            // 片付け（お好みで）
+            spherePs?.Stop();
+            fresnelSphere?.SetActive(false);
+        }
+
+        public override void OnFixedUpdate()
+        {
+            base.OnFixedUpdate();
+
+            // Fielld particle drain
+            if (FieldON)
+                ParticleDrainUpdate(Time.fixedDeltaTime);
+        }
+
+        private void ParticleDrainUpdate(double dt)
+        {
+            // Fielld particle drain
+            var myES = part.Modules.GetModule<GNBaseSystem>()?.ES;
+            if (myES != null || myES != DriveState.Depleted)
+            {
+                amountToDrain = drainRate * dt * Math.Pow(myradius / 10d, 2d);
+                actualDrain = part.RequestResource("GNparticle", amountToDrain);
+                if (actualDrain < amountToDrain - 1f)
+                {
+                    // Not enough resource, turn off field
+                    FieldON = false;
+                }
+            }
+        }
+
+        private void FieldUpdate()
+        {
+            // radious adjust.
+            myradius = myRadiousWithOutOffset + radiousOffset;
+
+            // パラメータ変更に追従させる
+            if (spherePs != null)
+            {
+                var main = spherePs.main;
+                main.startSize = myradius * 0.01f * myStartSize;
+                main.startLifetime = myStartLifeTime;
+                main.startSpeed = myStartSpeed;
+                var emission = spherePs.emission;
+                emission.rateOverTime = myRateOverTime;
+                var shape = spherePs.shape;
+                shape.radius = myradius;
+                shape.radiusThickness = myThickness;
+
+                if (FieldON)
+                {
+                    if (!spherePs.isPlaying)
+                    {
+                        spherePs.Play();
+                    }
+                }
+                else
+                {
+                    if (spherePs.isPlaying)
+                    {
+                        spherePs.Stop();
+                    }
+                }
+
+                GNParticleHelpers.SetPSPosition(spherePs, part, part.vessel);
+            }
+
+            // sphere on
+            fresnelSphere.SetActive(FieldON);
+
+            // update sphere
+            if (FieldON)
+            {
+                // 半径変更に追従
+                float d = myradius * 2f;
+                fresnelSphere.transform.localScale = Vector3.one * d;
+
+                // CoM に追従
+                Vector3 worldCoM = vessel.CoM;
+                Vector3 localCoM = part.transform.InverseTransformPoint(worldCoM);
+                fresnelSphere.transform.localPosition = localCoM;
+
+                var fc = FlightCamera.fetch;
+
+                var cam = fc.mainCamera;
+                var t = fresnelSphere.transform;
+
+                for (int i = 0; i < baseVerts.Length; i++)
+                {
+                    // 頂点のワールド座標＆ワールド法線
+                    Vector3 worldPos = t.TransformPoint(baseVerts[i]);
+                    Vector3 worldNormal = t.TransformDirection(baseNormals[i]).normalized;
+
+                    // カメラから頂点への視線方向
+                    Vector3 viewDir = (cam.transform.position - worldPos).normalized;
+
+                    // ndotv: N・V
+                    float ndotv = Mathf.Abs(Vector3.Dot(worldNormal, viewDir));
+
+                    // フレネルっぽい係数: 正面 0, 縁 1
+                    float fresnel = 1f - ndotv;
+                    fresnel = Mathf.Pow(fresnel, fresnelPower);
+
+                    // 頂点カラーに反映（RGBは一定、Alphaだけ変化）
+                    vertColors[i].r = fresnelColor.r;
+                    vertColors[i].g = fresnelColor.g;
+                    vertColors[i].b = fresnelColor.b;
+                    vertColors[i].a = fresnel * fresnelAlphaScale;
+                }
+
+                fresnelMesh.colors = vertColors;
+            }
+        }
+
+        private void SphereFieldCreate()
+        {
+            // 球メッシュを作成
+            fresnelSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            fresnelSphere.name = "GN_FresnelSphere";
+            fresnelSphere.transform.SetParent(part.transform, false);
+
+            // コライダーは不要なので削除
+            UnityEngine.Object.Destroy(fresnelSphere.GetComponent<Collider>());
+
+            // 半径 myradius に合わせてスケール（直径 = 2R）
+            float d = myradius * 2f;
+            fresnelSphere.transform.localScale = Vector3.one * d;
+
+            // メッシュをインスタンス化して頂点カラーを書き換え可能にする
+            var mf = fresnelSphere.GetComponent<MeshFilter>();
+            if (mf != null && mf.sharedMesh != null)
+            {
+                fresnelMesh = UnityEngine.Object.Instantiate(mf.sharedMesh);
+                mf.mesh = fresnelMesh;
+
+                baseVerts = fresnelMesh.vertices;
+                baseNormals = fresnelMesh.normals;
+                vertColors = new Color[baseVerts.Length];
+            }
+
+            // マテリアル設定（頂点カラーを使う透明シェーダ）
+            var mr = fresnelSphere.GetComponent<MeshRenderer>();
+            var shader = Shader.Find(ShaderType); // 透明&頂点カラー対応
+
+            if (shader != null)
+            {
+                Debug.Log("[GN] Fresnel shader found.");
+                var mat = new Material(shader);
+                mat.color = fresnelColor;   // RGB はここで制御、Alpha は頂点カラー
+                mr.material = mat;
+            }
+
+            // 最初はOFF
+            fresnelSphere.SetActive(false);
         }
     }
 }

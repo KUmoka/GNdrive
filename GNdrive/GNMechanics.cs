@@ -130,10 +130,6 @@ namespace GNTechnology
             //if (!vs.EngineState) return; Condenser should accumulate particles, so not related with Engine State.
             if (vs.Mode == GNVisualMode.Condenser) return; // コンデンサ側のvsは無視
 
-            // 0..1に収まる重み（好みでガンマ補正してもOK）
-            //float w = 1 //Mathf.Clamp01(vs.InputLevel); Condenser color shouldn't reflects main thrust
-            //if (w <= 0f) return;
-
             // vs.ParticleColor は linear/gamma いずれでもOK。必要なら Linear 変換をここに。
             sum += vs.ParticleColor * 1; // w;
             wsum += 1; // w;

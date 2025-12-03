@@ -202,13 +202,6 @@ namespace GNTechnology
             // limit factor calculation. When particle generation on, drive power should suppress sustainable level
             if (ps.SafeGuard)
             {
-                //if (pgdrive == 0) pgdrive = 1; // prevent div by 0
-                //if (consumption > 0 && consumption > TotalParticleGenRate) limitFactor = (float)(TotalParticleGenRate / (consumption * pgdrive));
-
-                //if (ps.IsFirstUpdate)
-                //{
-                //    limitFactor = (float)(ps.ParticleGenRate / consumption);
-                //} 
                 if (consumption > 0 && consumption > ps.UsedGNParticle) limitFactor =(float)(ps.UsedGNParticle / consumption);
             }
             else
