@@ -490,6 +490,12 @@ namespace GNTechnology
         // Particle System
         private ParticleSystem spherePs;
 
+        // Todo
+        // VesselPartsの加熱停止、空力停止
+        // 空力エフェクトをフィールド境界に設定
+        // 太陽熱防止
+        // 衝突判定
+
         private float myradius = 1f;
         private float myRateOverTime = 10000f;
         private float myStartSize = 0.5f;
@@ -518,7 +524,7 @@ namespace GNTechnology
         private Color fresnelColor = new Color(0f, 1f, 170f / 255f, 1f);
         private float fresnelAlphaScale = 0.9f;
         private float fresnelPower = 3.0f;
-        private float step = 5f;
+        private float step = 0.5f * Time.deltaTime;
         private float FieldStrength = 0.0f;
         private float target = 0.0f;
 
@@ -626,39 +632,38 @@ namespace GNTechnology
             myradius = myRadiousWithOutOffset + radiousOffset;
 
             // パラメータ変更に追従させる
-            if (spherePs != null)
+            var main = spherePs.main;
+            main.startSize = myradius * 0.01f * myStartSize;
+            main.startLifetime = myStartLifeTime;
+            main.startSpeed = myStartSpeed;
+            var emission = spherePs.emission;
+            emission.rateOverTime = myRateOverTime;
+            var shape = spherePs.shape;
+            shape.radius = myradius;
+            shape.radiusThickness = myThickness;
+
+            if (FieldON)
             {
-                var main = spherePs.main;
-                main.startSize = myradius * 0.01f * myStartSize;
-                main.startLifetime = myStartLifeTime;
-                main.startSpeed = myStartSpeed;
-                var emission = spherePs.emission;
-                emission.rateOverTime = myRateOverTime;
-                var shape = spherePs.shape;
-                shape.radius = myradius;
-                shape.radiusThickness = myThickness;
-
-                if (FieldON)
+                if (!spherePs.isPlaying)
                 {
-                    if (!spherePs.isPlaying)
-                    {
-                        spherePs.Play();
-                    }
+                    spherePs.Play();
                 }
-                else
+            }
+            else
+            {
+                if (spherePs.isPlaying)
                 {
-                    if (spherePs.isPlaying)
-                    {
-                        spherePs.Stop();
-                    }
+                    spherePs.Stop();
                 }
-
-                GNParticleHelpers.SetPSPosition(spherePs, part, part.vessel);
             }
 
-            // fiueld calculation
+            fresnelColor = part.Modules.GetModule<GNBaseSystem>()?.vs.ParticleColor ?? new Color(0f, 1f, 170f / 255f, 1f);
+            GNParticleHelpers.SetPSPosition(spherePs, part, part.vessel);
+            GNParticleHelpers.SetParticleStartColor(spherePs, fresnelColor);
+            
+            // field calculation
             target = FieldON ? 1.0f : 0.0f;
-            FieldStrength = Mathf.MoveTowards(FieldStrength, target, step * Time.deltaTime);
+            FieldStrength = Mathf.MoveTowards(FieldStrength, target, step);
 
             // sphere on/off
             fresnelSphere.SetActive(FieldStrength > 1e-5);
@@ -695,10 +700,10 @@ namespace GNTechnology
                     float fresnel = 1f - ndotv;
                     fresnel = Mathf.Pow(fresnel, fresnelPower);
 
-                    // 頂点カラーに反映（RGBは一定、Alphaだけ変化）
-                    vertColors[i].r = fresnelColor.r;
-                    vertColors[i].g = fresnelColor.g;
-                    vertColors[i].b = fresnelColor.b;
+                    // 頂点カラーに反映（rgba）
+                    vertColors[i].r = Mathf.MoveTowards(vertColors[i].r, fresnelColor.r, step);
+                    vertColors[i].g = Mathf.MoveTowards(vertColors[i].g, fresnelColor.g, step);
+                    vertColors[i].b = Mathf.MoveTowards(vertColors[i].b, fresnelColor.b, step);
                     vertColors[i].a = fresnel * fresnelAlphaScale * FieldStrength;
                 }
                 fresnelMesh.colors = vertColors;
