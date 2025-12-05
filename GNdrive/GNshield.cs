@@ -1,8 +1,10 @@
 ﻿using KSP;
 using KSP.IO;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using static UnityEngine.TouchScreenKeyboard;
 
 namespace GNTechnology
 {
@@ -533,6 +535,9 @@ namespace GNTechnology
         private double amountToDrain = 0d;
         private double actualDrain = 0d;
 
+        // Actual Effects
+        private GNfieldSurfaceModule _field;
+
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
@@ -573,6 +578,14 @@ namespace GNTechnology
 
             // Fresnel Sphere Create
             SphereFieldCreate();
+
+            // for GN field
+            _field = part.FindModuleImplementing<GNfieldSurfaceModule>();
+            if (_field == null)
+            {
+                Debug.LogError("[GN] GNShieldModule: GNfieldSurfaceModule not found on same part!");
+            }
+
         }
 
         public override void OnUpdate()
@@ -591,6 +604,12 @@ namespace GNTechnology
 
             if (vessel.packed && FieldON)
                 ParticleDrainUpdate(TimeWarp.deltaTime);
+
+            // 半径を連動
+            if (_field != null)
+            {
+                _field.fieldRadius = myradius;
+            }
         }
 
         public override void OnInactive()
@@ -608,6 +627,15 @@ namespace GNTechnology
             // Fielld particle drain
             if (FieldON)
                 ParticleDrainUpdate(Time.fixedDeltaTime);
+
+            // GN field surface module control
+            if (!FieldON)
+            {
+                _field.SetActive(false);
+                return;
+            }
+
+            _field.SetActive(true);
         }
 
         private void ParticleDrainUpdate(double dt)
@@ -750,6 +778,147 @@ namespace GNTechnology
 
             // 最初はOFF
             fresnelSphere.SetActive(false);
+        }
+    }
+
+    // GN field surface module
+    public class GNfieldSurfaceModule : ModuleCargoBay
+    {
+        // Todo
+        // 自パーツの空力をオフにする
+        // フィールド型のドラッグを実装する
+        // フィールド境界に空力エフェクトを設定する
+
+        // 外部制御用フラグ（PAWには出さない）
+        [KSPField(isPersistant = true)]
+        public bool isActive = false;
+
+        // 半径も外部から上書きされる前提（ここでは内部管理だけ）
+        [KSPField(isPersistant = true)]
+        public float fieldRadius = 1f;
+
+        [KSPField(isPersistant = true)]
+        public int updateInterval = 5;
+
+        private int _frameCounter = 0;
+        private readonly Dictionary<Part, bool> _shieldedByThis = new Dictionary<Part, bool>(); //要チェック
+
+        public override void OnStart(StartState state)
+        {
+            base.OnStart(state);
+
+            // ModuleCargoBay の PAW を全部隠す
+            HideCargoBayPAW();
+
+            // CargoBay内部パラメータは、とりあえずGN用に固定
+            lookupRadius = fieldRadius;
+            DeployModuleIndex = -1;  // アニメ連動させない
+            closedPosition = 0f;
+        }
+
+        public override void OnUpdate()
+        {
+            base.OnUpdate();
+
+            if (!HighLogic.LoadedSceneIsFlight || vessel == null)
+                return;
+
+            lookupRadius = fieldRadius;
+
+            _frameCounter++;
+            if (_frameCounter < updateInterval) return;
+            _frameCounter = 0;
+
+            UpdateShielding();
+        }
+
+        private void UpdateShielding()
+        {
+            // まず自分が付けたシールドをクリア
+            CleanupShielding();
+
+            if (!isActive) return;
+
+            float r2 = fieldRadius * fieldRadius;
+            Vector3 center = part.transform.position;
+
+            foreach (var p in vessel.parts)
+            {
+                if (p == null || p == part) continue;
+
+                Vector3 delta = p.transform.position - center;
+                if (delta.sqrMagnitude > r2) continue;
+
+                bool wasShielded = p.ShieldedFromAirstream;
+
+                if (!wasShielded)
+                {
+                    p.ShieldedFromAirstream = true;
+                }
+
+                _shieldedByThis[p] = !wasShielded;
+            }
+        }
+
+        private void CleanupShielding()
+        {
+            if (_shieldedByThis.Count == 0) return;
+
+            var keys = new List<Part>(_shieldedByThis.Keys);
+            foreach (var p in keys)
+            {
+                if (p == null)
+                {
+                    _shieldedByThis.Remove(p);
+                    continue;
+                }
+
+                bool weSetShield = _shieldedByThis[p];
+
+                if (weSetShield && p.ShieldedFromAirstream)
+                {
+                    p.ShieldedFromAirstream = false;
+                }
+
+                _shieldedByThis.Remove(p);
+            }
+        }
+
+        private void HideCargoBayPAW()
+        {
+            // Fieldを全部非表示
+            if (Fields != null)
+            {
+                foreach (var f in Fields)
+                {
+                    f.guiActive = false;
+                    f.guiActiveEditor = false;
+                }
+            }
+
+            // Event（デプロイ、クローズ等）も非表示
+            if (Events != null)
+            {
+                foreach (var e in Events)
+                {
+                    e.guiActive = false;
+                    e.guiActiveEditor = false;
+                }
+            }
+        }
+
+        // 外部からON/OFFさせるためのヘルパー
+        public void SetActive(bool active)
+        {
+            if (isActive == active) return;
+
+            if (!active)
+            {
+                // OFFにする時はシールドをちゃんと解除
+                CleanupShielding();
+            }
+
+            isActive = active;
         }
     }
 }
