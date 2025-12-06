@@ -8,6 +8,14 @@ using static UnityEngine.TouchScreenKeyboard;
 
 namespace GNTechnology
 {
+    public struct AeroBackup
+    {
+        public float maxDrag;
+        public float minDrag;
+        public float dragScalar;
+        public bool dragCubesEnabled;
+    }
+
     public static class GNParticleHelpers
     {
         /// <summary>
@@ -792,6 +800,7 @@ namespace GNTechnology
         // 外部制御用フラグ（PAWには出さない）
         [KSPField(isPersistant = true)]
         public bool isActive = false;
+        private bool _wasActive = false;
 
         // 半径も外部から上書きされる前提（ここでは内部管理だけ）
         [KSPField(isPersistant = true)]
@@ -802,6 +811,10 @@ namespace GNTechnology
 
         private int _frameCounter = 0;
         private readonly Dictionary<Part, bool> _shieldedByThis = new Dictionary<Part, bool>(); //要チェック
+
+        // 空力バックアップ用構造体
+        private AeroBackup myAero;
+        float cdEff = 0.00005f; // 仮のCd効率
 
         public override void OnStart(StartState state)
         {
@@ -814,6 +827,11 @@ namespace GNTechnology
             lookupRadius = fieldRadius;
             DeployModuleIndex = -1;  // アニメ連動させない
             closedPosition = 0f;
+
+            // Backup Aero parameters
+            BackupAero();
+
+            //force activation
         }
 
         public override void OnUpdate()
@@ -830,6 +848,21 @@ namespace GNTechnology
             _frameCounter = 0;
 
             UpdateShielding();
+            UpdateAero();
+        }
+
+        public override void OnFixedUpdate()
+        {
+            base.OnFixedUpdate();
+            if (!HighLogic.LoadedSceneIsFlight || vessel == null)
+                return;
+
+            if (isActive)
+                {
+                // GN Field Drag Application
+                
+                ApplyGNFieldDrag(part.vessel, fieldRadius, cdEff);
+            }
         }
 
         private void UpdateShielding()
@@ -854,6 +887,7 @@ namespace GNTechnology
                 if (!wasShielded)
                 {
                     p.ShieldedFromAirstream = true;
+
                 }
 
                 _shieldedByThis[p] = !wasShielded;
@@ -881,6 +915,21 @@ namespace GNTechnology
                 }
 
                 _shieldedByThis.Remove(p);
+            }
+        }
+
+        private void UpdateAero()
+        {
+            if (_wasActive == isActive) return;
+            if (isActive)
+            {
+                killAero();
+                _wasActive = true;
+            }
+            else
+            {
+                restoreAero();
+                _wasActive = false;
             }
         }
 
@@ -919,6 +968,57 @@ namespace GNTechnology
             }
 
             isActive = active;
+        }
+
+        private void BackupAero()
+        {
+            myAero = new AeroBackup
+            {
+                maxDrag = part.maximum_drag,
+                minDrag = part.minimum_drag,
+                dragScalar = part.dragScalar,
+                //dragCubesEnabled = (part.DragCubes != null && part.DragCubes.Cubes.Count > 0)
+            };
+        }
+
+        private void killAero()
+        {
+            part.maximum_drag = 0f;
+            part.minimum_drag = 0f;
+            part.dragScalar = 0f;
+        }
+
+        private void restoreAero()
+        {
+            part.maximum_drag = myAero.maxDrag;
+            part.minimum_drag = myAero.minDrag;
+            part.dragScalar = myAero.dragScalar;
+        }
+
+        private void ApplyGNFieldDrag(Vessel v, float fieldRadius, float cdEff)
+        {
+            if (v == null || v.rootPart == null) return;
+
+            // ここがポイント：Vesselではなく rootPart から Rigidbody を取る
+            Rigidbody rb = v.rootPart.rb;
+            if (rb == null) return; // パック中やマップ中だと null になることもある
+
+            Vector3d vel = v.srf_velocity;
+            double speed = vel.magnitude;
+            if (speed < 0.1) return;
+
+            double rho = v.atmDensity;
+            if (rho <= 0) return;
+
+            double area = Math.PI * fieldRadius * fieldRadius;
+            double Fmag = 0.5 * rho * Math.Pow(speed, 1.5d) * cdEff * area;
+
+            Vector3d dir = -vel.normalized;
+
+            Vector3 force = (Vector3)(dir * Fmag);
+            Vector3 pos = v.CoM;
+
+            rb.AddForceAtPosition(force, pos, ForceMode.Force);
         }
     }
 }
