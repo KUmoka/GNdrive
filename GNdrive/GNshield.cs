@@ -877,7 +877,7 @@ namespace GNTechnology
 
             foreach (var p in vessel.parts)
             {
-                if (p == null || p == part) continue;
+                if (p == null) continue; // || p == part
 
                 Vector3 delta = p.transform.position - center;
                 if (delta.sqrMagnitude > r2) continue;
