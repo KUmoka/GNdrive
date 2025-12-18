@@ -12,11 +12,13 @@ namespace GNTechnology
         public List<GNCondenserDriveSystem> GNCondernserDrive = new List<GNCondenserDriveSystem>();
         public List<GNDriveSystem> GNDrive = new List<GNDriveSystem>();
         public List<GNDriveTauSystem> GNDriveTau = new List<GNDriveTauSystem>();
+        public List<GNShieldModule> GNShield = new List<GNShieldModule>();
 
         public override bool ShouldBeActive()
         {
             // GN系 PartModule を1つでも積んでいれば有効化
             return false;//vessel != null && (vessel.FindPartModulesImplementing<GNBaseSystem>().Count > 0);
+            // return true;
         }
 
         protected override void OnStart()
@@ -28,12 +30,20 @@ namespace GNTechnology
 
         private void MakeDriveList()
         {
+            // init
+            List<GNThrusterSystem> GNThruster = new List<GNThrusterSystem>();
+            List<GNCondenserDriveSystem> GNCondernserDrive = new List<GNCondenserDriveSystem>();
+            List<GNDriveSystem> GNDrive = new List<GNDriveSystem>();
+            List<GNDriveTauSystem> GNDriveTau = new List<GNDriveTauSystem>();
+            List<GNShieldModule> GNShield = new List<GNShieldModule>();
+
             foreach (var p in vessel.parts)
             {
                 var th = p.FindModulesImplementing<GNThrusterSystem>();
                 var con = p.FindModulesImplementing<GNCondenserDriveSystem>();
                 var taus = p.FindModulesImplementing<GNDriveTauSystem>();
                 var gns = p.FindModulesImplementing<GNDriveSystem>();
+                var shlds = p.FindModulesImplementing<GNShieldModule>();
 
                 foreach (var m in th)
                 {
@@ -53,6 +63,10 @@ namespace GNTechnology
                 foreach (var m in gns)
                 {
                     GNDrive.Add(m);
+                }
+                foreach (var m in shlds)
+                {
+                    GNShield.Add(m);
                 }
             }
         }
