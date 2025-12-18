@@ -56,7 +56,6 @@ namespace GNTechnology
                 }
             }
         }
-
     }
 
     public static class GNVisualAggregator

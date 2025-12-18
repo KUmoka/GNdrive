@@ -29,6 +29,9 @@ namespace GNTechnology
         public KSPParticleEmitter[] ParticleEmitters; //EMI (particle emitters)
         public Transform[] MovingParts; // for thrusters
 
+        // for propulsion vectors
+        public Vector3d ThrustVector; //combined thrust vector
+
         public static GNVisualState Empty => new GNVisualState
         {
             // Basic info
@@ -47,7 +50,10 @@ namespace GNTechnology
             GlowLights = Array.Empty<Light>(),
             EmissiveRenderers = Array.Empty<Renderer>(),
             ParticleEmitters = Array.Empty<KSPParticleEmitter>(),
-            MovingParts = Array.Empty<Transform>()
+            MovingParts = Array.Empty<Transform>(),
+
+            // for propulsion vectors
+            ThrustVector = Vector3d.zero
         };
     }
 
@@ -91,7 +97,7 @@ namespace GNTechnology
             UpdateRotor(vs.Rotors, 0f, 0f); // no rotation
             UpdateMove(vs.MovingParts, level, vs.MoveDistance);
             UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed); // Condenser glow
-            UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, 0f, vs.part.vessel); // no particle emission
+            UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, 0f, vs.part.vessel, vs); // no particle emission
         }
 
         public static void UpdateVisual(ref GNVisualState vs)
@@ -131,7 +137,7 @@ namespace GNTechnology
 
                 // normal update
                 UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed);
-                UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, lv, vessel);
+                UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, lv, vessel, vs);
 
                 // smoothed should be determined by previous step smoothed and step.
                 smoothed = Mathf.MoveTowards(vs.Smoothed, lv, step);
@@ -145,7 +151,7 @@ namespace GNTechnology
                 if (vs.MoveOn) UpdateMove(vs.MovingParts, level, vs.MoveDistance);
                 else UpdateMove(vs.MovingParts, 0f, vs.MoveDistance); // Moving parts
                 UpdateGlow(vs.EmissiveRenderers, vs.GlowLights, vs.ParticleColor, level, out smoothed);
-                if (vs.Mode != GNVisualMode.Condenser) UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, level, vessel);
+                if (vs.Mode != GNVisualMode.Condenser) UpdateParticle(vs.ParticleEmitters, vs.ParticleColor, level, vessel, vs);
             }
 
             // use modified level
@@ -266,14 +272,17 @@ namespace GNTechnology
             }
         }
 
-        private static void UpdateParticle(KSPParticleEmitter[] emitters, Color particleColor, float level, Vessel vessel)
+        private static void UpdateParticle(KSPParticleEmitter[] emitters, Color particleColor, float level, Vessel vessel, GNVisualState vs)
         {
             // initial check
             if (emitters == null) return;
 
+            // calculation for tMin/tMax
+            float levelMult = vessel.ActionGroups[KSPActionGroup.Brakes] ? Mathf.Clamp((float)vs.ThrustVector.magnitude, 0.1f, 1.0f) : level;
+
             // seettings
-            float tMin = 7000f * level * level;
-            float tMax = 9000f * level * level;
+            float tMin = 7000f * Mathf.Pow(levelMult, 2f);
+            float tMax = 9000f * Mathf.Pow(levelMult, 2f);
 
             for (int i = 0; i < emitters.Length; i++)
             {
@@ -285,7 +294,7 @@ namespace GNTechnology
                 e.emit = true;
                 e.minEmission = (int)Mathf.Lerp(e.minEmission, tMin, 100f * Time.deltaTime); //10f for last
                 e.maxEmission = (int)Mathf.Lerp(e.maxEmission, tMax, 100f * Time.deltaTime);
-                e.localVelocity = new Vector3(0f, -1 * Mathf.Lerp(5f, 45f, level), 0f);
+                e.localVelocity = new Vector3(0f, -1 * Mathf.Lerp(5f, 45f, levelMult), 0f);
                 var ps = e.GetComponent<ParticleSystem>();
                 var keys = e.colorAnimation; // Color[5]
 
@@ -293,7 +302,7 @@ namespace GNTechnology
                 SetEmitterColor_PS(ps, particleColor, keys);
 
                 // particle dynamics system
-                SetEmitterDynamics_PS(ps, level, vessel);
+                SetEmitterDynamics_PS(ps, levelMult, vessel, vs.ThrustVector);
                 //DumpEmitter(e, "GN");
             }
         }
@@ -321,7 +330,7 @@ namespace GNTechnology
             colOL.color = new ParticleSystem.MinMaxGradient(g2);
         }
 
-        private static void SetEmitterDynamics_PS(ParticleSystem ps, float level, Vessel vessel) //KSPParticleEmitter e
+        private static void SetEmitterDynamics_PS(ParticleSystem ps, float level, Vessel vessel, Vector3 BackVector) //KSPParticleEmitter e
         {
             var main = ps.main;
             float startSpeed = 45f;
@@ -330,7 +339,7 @@ namespace GNTechnology
             main.simulationSpace = ParticleSystemSimulationSpace.Local;
             main.startSpeed = startSpeed;    // 例：20f;
 
-            Vector3 vesselBackWorld = GetCombinedThrustVector(vessel, 1.0f);// -vessel.ReferenceTransform.up.normalized;
+            Vector3 vesselBackWorld = -1f * BackVector; //GetCombinedThrustVector(vessel, 1.0f);// -vessel.ReferenceTransform.up.normalized;
             Vector3 vesselBackLocal = ps.transform.InverseTransformDirection(vesselBackWorld);
             vesselBackLocal.Normalize();
 

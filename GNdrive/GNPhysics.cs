@@ -33,6 +33,9 @@ namespace GNTechnology
         public bool GNdepleted; // whether the EC is depleted.
         public bool ECdepleted; // whether the EC is depleted.
 
+        // For brake vectors
+        public Vector3 ThrustDir;
+
         public static GNPhysicsState Empty => new GNPhysicsState
         {
             // Basic defaults
@@ -54,7 +57,10 @@ namespace GNTechnology
             SyncRate = 1f,
             UnSync = false,
             GNdepleted = false,
-            ECdepleted = false
+            ECdepleted = false,
+
+            //for brake vectors
+            ThrustDir = Vector3.zero
         };
     }
 
@@ -122,8 +128,8 @@ namespace GNTechnology
             Vector3 vSrf = (Vector3)vessel.srf_velocity;
             float speed = vSrf.magnitude;
             if (speed < 1) speed = 1f; // speed cramp
-            float BrakeMag = 1f;
-            if (speed == 1) BrakeMag = 0.05f;// speed == 1 is clamp active case.
+            float BrakeMag = (speed == 1) ? 0.05f : 1f; // 0.05f is speed is less than 1m/s
+            //if (speed == 1) BrakeMag = 0.05f;// speed == 1 is clamp active case.
             Vector3 brakeDir = -vSrf / speed; // unit vector until speed < 1
 
             // Find active drives per functions.
@@ -270,6 +276,8 @@ namespace GNTechnology
                 // Calc force
                 p2.AddForce((brakes ? brakeDir * BrakeMag : ThrustDirection) * ThrustBudget * limitFactor * p2.rb.mass);
             }
+
+            ps.ThrustDir = (brakes ? brakeDir : ThrustDirection);
         }
 
         static float _hoverLastA = 0f;      // Previous accel rate [m/s^2]（for through rate）

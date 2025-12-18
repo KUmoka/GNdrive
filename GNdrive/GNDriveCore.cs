@@ -15,7 +15,7 @@ using static VehiclePhysics.ProjectPatchAsset;
 
 namespace GNTechnology
 {
-    public enum DriveState //public enum DriveState {Unsynchronized, Depleted, Activated, Deactivated, Refilled}
+    public enum DriveState //public enum DriveState {Unsynchronized, Depleted, Activated, Deactivated, Refilled, Reposed}
     {
         [Description("⚠ Unsync!")]
         Unsynchronized,
@@ -30,7 +30,34 @@ namespace GNTechnology
         Deactivated,
 
         [Description("🔋 Refilled")]
-        Refilled
+        Refilled,
+
+        [Description("⏹️ Reposed")]
+        Reposed
+    }
+
+    public struct GNSystemState
+    {
+        public bool EngineOn;
+        public bool AntigravityOn;
+        public bool HoveringOn;
+        public bool TransAMOn;
+        public float Acceleration;
+        public bool ECInputOn;
+        public bool SafetyGuardOn;
+        public bool SynchronizeOn;
+
+        public static GNSystemState Empty => new GNSystemState
+        {
+            EngineOn = false,
+            AntigravityOn = false,
+            HoveringOn = false,
+            TransAMOn = false,
+            Acceleration = 0f,
+            ECInputOn = false,
+            SafetyGuardOn = false,
+            SynchronizeOn = false
+        };
     }
 
     public class GNBaseSystem : PartModule // Pure condenser, Effect control system implemented here.
@@ -118,6 +145,13 @@ namespace GNTechnology
             MoveOn = !MoveOn;
         }
 
+        // Added actions
+        [KSPAction("Toggle Repose")]
+        public void ToggleRepose(KSPActionParam param)
+        {
+            Repose = !Repose;
+        }
+
         // KSP fields for engine control.
         [KSPField(guiActive = false, guiActiveEditor = false, guiName = "Engine State", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
         public bool engineOn = false;
@@ -135,6 +169,15 @@ namespace GNTechnology
         public bool sgOn = false;
         [KSPField(guiActive = false, guiActiveEditor = false, guiName = "Synchronize Target Drive", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
         public bool SyOn = false;
+
+        // For added actions
+        [KSPField(guiActive = false, guiActiveEditor = false, guiName = "GN Repose", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
+        public bool Repose = false;
+        [KSPField(guiActive = false, guiActiveEditor = false, guiName = "System Switch", isPersistant = true)]
+        public GNSystemState previousGNSystemState = new GNSystemState();
+        private bool previousRepose = false;
+        protected string[] ReposeActionList;        // variables for Repose
+        protected string[] ReposeFieldList;        // variables for Repose
 
         // KSP field for OriginalMaxG
         [KSPField(guiName = "Maximum Acceleration", guiActive = false, guiActiveEditor = true, isPersistant = true)]
@@ -211,6 +254,9 @@ namespace GNTechnology
             StatusInit();
             EnsureIndividuality();
 
+            // Repose related initialization
+            InitRepose();
+
             // System Initialize
             Debug.Log("[GN] SystemInit Completed.");
         }
@@ -229,6 +275,9 @@ namespace GNTechnology
             StatusUpdate();
             SyncUpdate();
             ParticleGenerationUpdate();
+
+            // Repose Update
+            UpdateRepose();
         }
 
         public override void OnFixedUpdate()
@@ -276,6 +325,7 @@ namespace GNTechnology
             vs.EngineState = engineOn;
             vs.InputLevel = InputLevel();
             vs.MoveOn = MoveOn;
+            vs.ThrustVector = ps.ThrustDir;
             GNVisuals.UpdateVisual(ref vs);
         }
 
@@ -617,6 +667,9 @@ namespace GNTechnology
 
             // Tau only
             Hide("ECOn");
+
+            // added fields
+            Hide("Repose");
         }
         private void ActionInitialization()
         {
@@ -646,6 +699,9 @@ namespace GNTechnology
             Hide("ToggleSgAction");
             Hide("ToggleSyAction");
             Hide("ToggleMoveOn");
+
+            // added actions
+            Hide("ToggleRepose");
         }
 
         protected void PAWActivate(params string[] fieldNames)
@@ -729,6 +785,68 @@ namespace GNTechnology
         {
             DriveIndividuality *= rate;
         }
+
+        private void InitRepose()
+        {
+            Repose = false;
+            previousRepose = Repose;
+            previousGNSystemState = GNSystemState.Empty; // need initialization to work?
+        }
+
+        private void UpdateRepose()
+        {
+            if (previousRepose == Repose) return; // no change
+            if (Repose)
+            {
+                PAWDeactivate(ReposeFieldList);
+                ActionDeactivate(ReposeActionList);
+                retractGNSystemState();
+                previousRepose = Repose;
+            }
+            else
+            {
+                PAWActivate(ReposeFieldList);
+                ActionActivate(ReposeActionList);
+                deployGNSystemState();
+                previousRepose = Repose;
+            }
+        }
+
+        private void retractGNSystemState()
+        {
+            previousGNSystemState = new GNSystemState
+            {
+                EngineOn = true,
+                AntigravityOn = agOn,
+                HoveringOn = hvOn,
+                TransAMOn = taOn,
+                Acceleration = accel,
+                ECInputOn = ECOn,
+                SafetyGuardOn = sgOn,
+                SynchronizeOn = SyOn
+            };
+
+            engineOn = true;
+            agOn = false;
+            hvOn = false;
+            taOn = false;
+            accel = 0f;
+            ECOn = false;
+            sgOn = false;
+            SyOn = false;
+        }
+        
+        private void deployGNSystemState()
+        {
+            engineOn = previousGNSystemState.EngineOn;
+            agOn = previousGNSystemState.AntigravityOn;
+            hvOn = previousGNSystemState.HoveringOn;
+            taOn = previousGNSystemState.TransAMOn;
+            accel = previousGNSystemState.Acceleration;
+            ECOn = previousGNSystemState.ECInputOn;
+            sgOn = previousGNSystemState.SafetyGuardOn;
+            SyOn = previousGNSystemState.SynchronizeOn;
+        }
     }
 
     public class GNThrusterSystem : GNBaseSystem // GN thrusters
@@ -756,16 +874,20 @@ namespace GNTechnology
             part.stagingIconAlwaysShown = true;
             part.stagingOn = true;
 
+            ReposeFieldList = new string[] { "engineOn", "accel", "ESDisplay" };
+            ReposeActionList = new string[] { "ToggleEngineAction", "IncreaseMaxGAction", "DecreaseMaxGAction" };
+
             // PAW and Action setup
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("engineOn", "accel", "ESDisplay");
+                PAWActivate(ReposeFieldList);
+                PAWActivate("Repose");
             }
             else
             {
                 PAWActivate("accel");
             }
-            ActionActivate("ToggleEngineAction", "IncreaseMaxGAction", "DecreaseMaxGAction", "ToggleMoveOn");
+            ActionActivate(ReposeActionList);
 
             vs.Mode = GNVisualMode.Drive;
             vs.RotorSpeed = 180f; // thruster rotor speed
@@ -823,15 +945,19 @@ namespace GNTechnology
             part.stagingOn = true;
 
             // PAW and Action setup
+            ReposeFieldList = new string[] { "engineOn", "agOn", "hvOn", "accel", "ESDisplay" };
+            ReposeActionList = new string[] { "ToggleEngineAction", "ToggleAgAction", "ToggleHvAction", "IncreaseMaxGAction", "DecreaseMaxGAction" };
+
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("engineOn", "agOn", "hvOn", "accel", "ESDisplay");
+                PAWActivate(ReposeFieldList);
+                PAWActivate("Repose");
             }
             else
             {
                 PAWActivate("accel");
             }
-            ActionActivate("ToggleEngineAction", "ToggleAgAction", "ToggleHvAction", "IncreaseMaxGAction", "DecreaseMaxGAction");
+            ActionActivate(ReposeActionList);
 
             vs.Mode = GNVisualMode.CondenserDrive;
             vs.RotorSpeed = 180f; // thruster rotor speed
@@ -898,9 +1024,12 @@ namespace GNTechnology
             part.stagingOn = true;
 
             // PAW and Action setup
+            ReposeFieldList = new string[] { "agOn", "hvOn", "accel", "SyOn", "ECOn", "sgOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay" };
+            ReposeActionList = new string[] { "ToggleEngineAction", "ToggleAgAction", "ToggleHvAction", "IncreaseMaxGAction", "DecreaseMaxGAction", "ToggleECAction", "ToggleSgAction", "ToggleSyAction" };
+
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("agOn", "hvOn", "accel", "SyOn", "ECOn", "sgOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay");
+                PAWActivate(ReposeFieldList);
                 if (part.Resources["TopologicalDefects"].amount < 0.5)
                 {
                     PAWActivate("engineOn");
@@ -911,12 +1040,13 @@ namespace GNTechnology
                     engineOn = true;
                     ECOn = true;
                 }
+                PAWActivate("Repose");
             }
             else
             {
                 PAWActivate("accel", "SyOn", "sgOn", "ECOn", "DriveIndividuality", "ParticleGeneration");
             }
-            ActionActivate("ToggleEngineAction", "ToggleAgAction", "ToggleHvAction", "IncreaseMaxGAction", "DecreaseMaxGAction", "ToggleECAction", "ToggleSgAction", "ToggleSyAction");
+            ActionActivate(ReposeActionList);
 
             vs.Mode = GNVisualMode.Drive;
             vs.RotorSpeed = 180f; // thruster rotor speed
@@ -1013,17 +1143,21 @@ namespace GNTechnology
             part.force_activate();
 
             // PAW and Action setup
+            ReposeFieldList = new string[] { "agOn", "hvOn", "taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay" };
+            ReposeActionList = new string[] { "ToggleEngineAction", "ToggleAgAction", "ToggleHvAction", "IncreaseMaxGAction", "DecreaseMaxGAction" };
+
             if (HighLogic.LoadedSceneIsFlight)
             {
-                PAWActivate("agOn", "hvOn","taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay"); // Always on Engine, Cannot turn off.
-                if(IsMove)
+                PAWActivate(ReposeFieldList);
+                PAWActivate("Repose");
+                if (IsMove)
                     PAWActivate("MoveOn");
             }
             else
             {
                 PAWActivate("accel", "DriveIndividuality", "ParticleGeneration");
             }
-            ActionActivate("ToggleAgAction", "ToggleHvAction", "ToggleTaAction", "IncreaseMaxGAction", "DecreaseMaxGAction");
+            ActionActivate(ReposeActionList);
             if (IsMove) ActionActivate("ToggleMoveOn");
 
             vs.RotorSpeed = 180f; // thruster rotor speed
