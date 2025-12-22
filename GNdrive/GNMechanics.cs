@@ -17,8 +17,8 @@ namespace GNTechnology
         public override bool ShouldBeActive()
         {
             // GN系 PartModule を1つでも積んでいれば有効化
-            return false;//vessel != null && (vessel.FindPartModulesImplementing<GNBaseSystem>().Count > 0);
-            // return true;
+            // return false;//vessel != null && (vessel.FindPartModulesImplementing<GNBaseSystem>().Count > 0);
+            return true;
         }
 
         protected override void OnStart()
@@ -69,6 +69,8 @@ namespace GNTechnology
                     GNShield.Add(m);
                 }
             }
+
+            Debug.Log($"GNLists: Thruster={GNThruster.Count}, CondenserDrive={GNCondernserDrive.Count}, DriveTau={GNDriveTau.Count}, Drive={GNDrive.Count}, Shield={GNShield.Count}");
         }
     }
 

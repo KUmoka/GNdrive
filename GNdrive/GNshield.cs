@@ -168,6 +168,27 @@ namespace GNTechnology
             ps.transform.localPosition = part.transform.InverseTransformPoint(vessel.CoM);
         }
 
+        public static float GetMaxVesselRadiusFromCoM_A(Vessel vessel)
+        {
+            if (vessel == null || !vessel.loaded)
+            {
+                return 0f;
+            }
+
+            Vector3 worldCoM = vessel.CoM;
+            float maxDistance = 0f;
+
+            foreach (Part p in vessel.parts)
+            {
+
+
+
+
+            }
+
+            return 10f; // Placeholder for actual implementation
+        }
+
         public static float GetMaxVesselRadiusFromCoM(Vessel vessel)
         {
             if (vessel == null || !vessel.loaded)
@@ -222,7 +243,7 @@ namespace GNTechnology
                         float distance = Vector3.Distance(worldCoM, corner);
 
                         // 最大距離を更新
-                        if (distance > maxDistance)
+                        if (distance > maxDistance && distance < 1000)
                         {
                             maxDistance = distance;
                         }
@@ -232,10 +253,6 @@ namespace GNTechnology
 
             return maxDistance;
         }
-
-
-
-
     }
 
     public class GNTestSphereFX : PartModule
@@ -506,7 +523,11 @@ namespace GNTechnology
         // 太陽熱防止
         // 衝突判定
 
-        private float myradius = 1f;
+        //debug
+        [KSPField(guiName = "Sheild Radious", guiActive = true, guiActiveEditor = true, isPersistant = false)]
+        public float myradius = 1f;
+
+        // Particle parameters
         private float myRateOverTime = 10000f;
         private float myStartSize = 0.5f;
         private float myStartLifeTime = 0.4f;
@@ -593,7 +614,6 @@ namespace GNTechnology
             {
                 Debug.LogError("[GN] GNShieldModule: GNfieldSurfaceModule not found on same part!");
             }
-
         }
 
         public override void OnUpdate()
