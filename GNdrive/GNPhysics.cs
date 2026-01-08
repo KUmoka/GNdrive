@@ -378,7 +378,7 @@ namespace GNTechnology
 
         private static void FurnaceCutOff(ref GNPhysicsState ps)
         {
-            Debug.Log("EC depleted during GN particle generation.");
+            //Debug.Log("EC depleted during GN particle generation.");
             ps.ECOn = false;
             ps.ECdepleted = true;
         }

@@ -168,27 +168,6 @@ namespace GNTechnology
             ps.transform.localPosition = part.transform.InverseTransformPoint(vessel.CoM);
         }
 
-        public static float GetMaxVesselRadiusFromCoM_A(Vessel vessel)
-        {
-            if (vessel == null || !vessel.loaded)
-            {
-                return 0f;
-            }
-
-            Vector3 worldCoM = vessel.CoM;
-            float maxDistance = 0f;
-
-            foreach (Part p in vessel.parts)
-            {
-
-
-
-
-            }
-
-            return 10f; // Placeholder for actual implementation
-        }
-
         public static float GetMaxVesselRadiusFromCoM(Vessel vessel)
         {
             if (vessel == null || !vessel.loaded)
@@ -212,6 +191,7 @@ namespace GNTechnology
                 foreach (MeshRenderer renderer in renderers)
                 {
                     if (renderer == null || !renderer.enabled) continue;
+                    if (renderer.name.Contains("GN_FresnelSphere")) continue;
 
                     // 4. レンダラーのワールド座標系におけるバウンディングボックスを取得
                     // Renderer.bounds はすでにワールド座標系です。
@@ -241,6 +221,7 @@ namespace GNTechnology
 
                         // CoMからの距離を計算
                         float distance = Vector3.Distance(worldCoM, corner);
+                        Debug.Log("[GN] Part: " + p.partInfo.title + ", Renderer: " + renderer.name + ", Corner: " + corner.ToString("F2") + ", Distance from CoM: " + distance.ToString("F2") + " m");
 
                         // 最大距離を更新
                         if (distance > maxDistance && distance < 1000)
@@ -517,15 +498,11 @@ namespace GNTechnology
         // Particle System
         private ParticleSystem spherePs;
 
-        // Todo
-        // VesselPartsの加熱停止、空力停止
-        // 空力エフェクトをフィールド境界に設定
-        // 太陽熱防止
-        // 衝突判定
-
-        //debug
+        //values
         [KSPField(guiName = "Sheild Radious", guiActive = true, guiActiveEditor = true, isPersistant = false)]
         public float myradius = 1f;
+        private float desiredmyradius = 1f;
+        private float reactionSpeed = 1f;
 
         // Particle parameters
         private float myRateOverTime = 10000f;
@@ -540,10 +517,10 @@ namespace GNTechnology
 
         // For vessel Module to notify ship changes
         public bool IsShipChanged = false;
+        private int previousPartCount = 0;
 
         // Constants.
         private float radiousOffset = 1f;
-        private float myRadiousWithOutOffset = 0f;
 
         // Fresnel Sphere variables
         private string ShaderType = "KSP/Particles/Alpha Blended";
@@ -577,9 +554,9 @@ namespace GNTechnology
             // Particle Color Initialization
             fresnelColor = part.Modules.GetModule<GNBaseSystem>()?.vs.ParticleColor ?? new Color(0f, 1f, 170f / 255f, 1f);
 
-            // radious initialization
-            myRadiousWithOutOffset = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel); // Too large, offset.
-            myradius = myRadiousWithOutOffset + radiousOffset;
+            // radius initialization.
+            myradius = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel) + radiousOffset; 
+            desiredmyradius = myradius; //prevent change at start.
 
             // とりあえず半径3m、毎秒200粒子くらいで試す
             spherePs = GNTechnology.GNParticleHelpers.CreateSphericalShellEmitter(
@@ -614,6 +591,11 @@ namespace GNTechnology
             {
                 Debug.LogError("[GN] GNShieldModule: GNfieldSurfaceModule not found on same part!");
             }
+
+            // Initial Vessel Part Count
+            previousPartCount = part.vessel.Parts.Count;
+            Debug.Log("[GN] GNShieldModule: Initial radius to " + myradius.ToString("F2") + " m.");
+            Debug.Log("[GN] GNShieldModule: Initial vessel part count: " + previousPartCount);
         }
 
         public override void OnUpdate()
@@ -623,13 +605,6 @@ namespace GNTechnology
             // Particle System and Fresnel Sphere Update
             FieldUpdate();
 
-            // Ship Change Check
-            if (IsShipChanged)
-            {
-                myradius = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel) + radiousOffset;
-                IsShipChanged = false;
-            }
-
             if (vessel.packed && FieldON)
                 ParticleDrainUpdate(TimeWarp.deltaTime);
 
@@ -638,6 +613,19 @@ namespace GNTechnology
             {
                 _field.fieldRadius = myradius;
             }
+
+            // Vessel Part Count for Radius Update
+            // if ship parts change, update radius
+            if(part.vessel.Parts.Count != previousPartCount || IsShipChanged)
+            {
+                // update desiredmyradius, and move myradius to desiredmyradius in FieldUpdate()
+                desiredmyradius = GNParticleHelpers.GetMaxVesselRadiusFromCoM(part.vessel) + radiousOffset;
+                previousPartCount = part.vessel.Parts.Count;
+                Debug.Log("[GN] GNShieldModule: Vessel parts changed, updating radius to " + myradius.ToString("F2") + " m.");
+                Debug.Log("[GN] GNShieldModule: Initial vessel part count: " + previousPartCount);
+                IsShipChanged = false;
+            }
+
         }
 
         public override void OnInactive()
@@ -684,10 +672,7 @@ namespace GNTechnology
 
         private void FieldUpdate()
         {
-            // radious adjust.
-            myradius = myRadiousWithOutOffset + radiousOffset;
-
-            // パラメータ変更に追従させる
+            // update parameters. note that myradius is updated in OnUpdate when ship parts change.
             var main = spherePs.main;
             main.startSize = myradius * 0.01f * myStartSize;
             main.startLifetime = myStartLifeTime;
@@ -720,6 +705,7 @@ namespace GNTechnology
             // field calculation
             target = FieldON ? 1.0f : 0.0f;
             FieldStrength = Mathf.MoveTowards(FieldStrength, target, step);
+            myradius = Mathf.MoveTowards(myradius, desiredmyradius, step * desiredmyradius * reactionSpeed); //step = 0.5m/sec.step * desiredmyradius takes 2s to reach desired radius.
 
             // sphere on/off
             fresnelSphere.SetActive(FieldStrength > 1e-5);
