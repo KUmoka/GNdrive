@@ -873,6 +873,7 @@ namespace GNTechnology
 
         private void UpdateShielding()
         {
+            // inefficient, later optimize.(v3 or later)
             // まず自分が付けたシールドをクリア
             CleanupShielding();
 
@@ -924,7 +925,7 @@ namespace GNTechnology
             }
         }
 
-        private void UpdateAero()
+        private void UpdateAero()//for GNfield source part
         {
             if (_wasActive == isActive) return;
             if (isActive)
