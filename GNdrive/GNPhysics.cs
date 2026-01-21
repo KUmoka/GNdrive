@@ -340,7 +340,7 @@ namespace GNTechnology
             double Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen); // EC pulled here, if not enough EC, Pulled < ECReqGen
 
             // EC empty, 1f threshold
-            if (Pulled <= 1f && ECReqGen > 0)
+            if (Pulled <= 1f * dt && ECReqGen > 0)
             {
                 FurnaceCutOff(ref ps);
                 return;

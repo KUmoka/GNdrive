@@ -2,6 +2,7 @@
 using System;
 using System.Linq;
 using UnityEngine;
+using static UnityEngine.GraphicsBuffer;
 
 namespace GNTechnology
 {
@@ -19,6 +20,9 @@ namespace GNTechnology
 
         //for move
         public float MoveDistance; // max move distance for thruster parts.
+        public float RotAngleX; // target rotation angle X for specific rotating parts 
+        public float RotAngleY; // target rotation angle Y for specific rotating parts
+        public float RotAngleZ; // target rotation angle Z for specific rotating parts
         public bool MoveOn; // true:move parts on, false:move parts off
         public bool EngineState; //true:engine on, false:engine off
 
@@ -28,6 +32,7 @@ namespace GNTechnology
         public Renderer[] EmissiveRenderers; //emissive renderers(rotor, stator)
         public KSPParticleEmitter[] ParticleEmitters; //EMI (particle emitters)
         public Transform[] MovingParts; // for thrusters
+        public Transform[] RotParts; // for specific angle rotating parts
 
         // for propulsion vectors
         public Vector3d ThrustVector; //combined thrust vector
@@ -42,6 +47,9 @@ namespace GNTechnology
             Smoothed = 0f,
             RotorSpeed = 0,
             MoveDistance = 0f,
+            RotAngleX = 0f,
+            RotAngleY = 0f,
+            RotAngleZ = 0f,
             MoveOn = false,
             EngineState = false,
 
@@ -51,6 +59,7 @@ namespace GNTechnology
             EmissiveRenderers = Array.Empty<Renderer>(),
             ParticleEmitters = Array.Empty<KSPParticleEmitter>(),
             MovingParts = Array.Empty<Transform>(),
+            RotParts = Array.Empty<Transform>(),
 
             // for propulsion vectors
             ThrustVector = Vector3d.zero
@@ -156,6 +165,7 @@ namespace GNTechnology
 
             // use modified level
             UpdateRotor(vs.Rotors, vs.RotorSpeed, smoothed); // usual
+            UpdateRotation(vs.RotParts, vs.RotAngleX, vs.RotAngleY, vs.RotAngleZ, 30f, vs.MoveOn); // specific rotating parts. later determine speed.
             vs.Smoothed = smoothed;
         }
 
@@ -194,6 +204,33 @@ namespace GNTechnology
 
                 // MoveTowards なら絶対に振動しない
                 t.localPosition = Vector3.MoveTowards(current, target, step);
+            }
+        }
+
+        private static void UpdateRotation(Transform[] RotaionObjects, float targetangleX, float targetangleY, float targetangleZ, float speed, bool OnOff)
+        {
+            if (RotaionObjects == null) return;
+
+            // angle convert to Quaternion
+            // if onoff then target angle, else 0 angle.
+            var AngleX = targetangleX;
+            var AngleY = targetangleY;
+            var AngleZ = targetangleZ;
+
+            if (!OnOff)
+            {
+                AngleX = 0f;
+                AngleY = 0f;
+                AngleZ = 0f;
+            }
+
+            Quaternion target = Quaternion.Euler(AngleX, AngleY, AngleZ);
+
+            for (int i = 0; i < RotaionObjects.Length; i++)
+            {
+                var t = RotaionObjects[i];
+
+                t.localRotation = Quaternion.RotateTowards(t.localRotation,target, speed * Time.deltaTime); // deltaTime/frame rate independent
             }
         }
 

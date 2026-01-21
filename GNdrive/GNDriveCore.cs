@@ -72,6 +72,7 @@ namespace GNTechnology
         List<Renderer> listR = new List<Renderer>();
         List<KSPParticleEmitter> listE = new List<KSPParticleEmitter>();
         List<Transform> listM = new List<Transform>();
+        List<Transform> listRot = new List<Transform>(); // rotating parts
 
         // variables for control state
         float X = 0f;
@@ -190,12 +191,14 @@ namespace GNTechnology
         public string ESDisplay = "None";
 
         // KSP field for Specs (Particle/EC Generation rate (Condenser = 0))
-        [KSPField(guiName = "Particle Generation", guiActive = true, guiActiveEditor = true, isPersistant = true)]
+        [KSPField(guiName = "Particle Generation", guiActive = true, guiActiveEditor = true, isPersistant = false)]
         public float ParticleGeneration = 0f;
-        [KSPField(guiName = "ElectricCharge Generation", guiActive = false, guiActiveEditor = false, isPersistant = true)]
+        [KSPField(guiName = "ElectricCharge Generation", guiActive = false, guiActiveEditor = false, isPersistant = false)]
         public double ECGeneration = 0f;
-        [KSPField(guiName = "MoveDistance", guiActive = false, guiActiveEditor = false, isPersistant = true)]
+        [KSPField(guiName = "MoveDistance", guiActive = false, guiActiveEditor = false, isPersistant = false)]
         public float MoveDistance = 0f;
+        [KSPField(guiName = "AngleOfRotationParts", guiActive = false, guiActiveEditor = false, isPersistant = false)]
+        public float RotationAngle = 0f;
         [KSPField(guiName = "Open Mode", guiActive = false, guiActiveEditor = false, isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
         public bool MoveOn = false;
         [KSPField(guiName = "IsMove", guiActive = false, guiActiveEditor = false, isPersistant = false)] // internal use, used for MovingParts control.
@@ -376,6 +379,7 @@ namespace GNTechnology
                 return;
 
             // Time Warp, particle generation continues in timewarp.
+            // Check if vessel is packed when not in timewarp...---------------------------------------------------------------------------------------------------------------------------------------------------
             if (vessel.packed)
                 ps.ECOn = ECOn;
                 GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.deltaTime);
@@ -494,6 +498,10 @@ namespace GNTechnology
             // parts specific values
             vs.RotorSpeed = 60f; // condenser rotor speed
             vs.MoveDistance = MoveDistance; // move distance in meters.
+
+            // Rotating parts specific values
+            vs.RotParts = listRot.ToArray();
+            vs.RotAngleX = RotationAngle; // rotation angle in degrees.
         }
 
         private void MakeList()
@@ -504,6 +512,7 @@ namespace GNTechnology
             listR.Clear();
             listE.Clear();
             listM.Clear();
+            listRot.Clear();
 
             // Make lists of Lights, Renderers, Emitters, etc. here if needed.
             var allT = part.transform.GetComponentsInChildren<Transform>(true);
@@ -516,6 +525,8 @@ namespace GNTechnology
                     listM.Add(t);// Moving Parts
                     IsMove = true;
                 }
+                if (t.name.Contains("rotation") && t.GetComponentInParent<Part>() == this.part)
+                    listRot.Add(t);// Specific angle rotating parts
             }
 
             var allL = part.transform.GetComponentsInChildren<Light>(true);
@@ -1058,6 +1069,7 @@ namespace GNTechnology
             // For Twin drive
             if (!Manufactured) CompressIndividuality(ManufactureVariance);
             Manufactured = true; // Mark as manufactured.
+            ps.SyncRate = 1f; // initialize sync rate.
 
             // Unit Off when start.
             GNVisuals.SetOff(vs);
@@ -1069,6 +1081,11 @@ namespace GNTechnology
         public override void OnUpdate()
         {
             base.OnUpdate();
+
+            // additional Engine State Control
+            MoveOn = !sgOn;
+            vs.MoveOn = MoveOn;
+
             //vs.ParticleColor = ParticleColor(); // Red for condenser, To avoid override on GNBaseSystem Class(DecideColor).
             vs.ParticleColor = GNColorDecider.ParticleColor(vs);
             ps.SafeGuard = sgOn;
@@ -1174,8 +1191,7 @@ namespace GNTechnology
             // For Twin drive
             if (!Manufactured) CompressIndividuality(ManufactureVariance);
             Manufactured = true; // Mark as manufactured.
-
-            ps.SyncRate = 1f;
+            ps.SyncRate = 1f; // initialize sync rate.
 
             // Debug
             Debug.Log($"[GN] vs.Mode={vs.Mode}");
