@@ -70,6 +70,7 @@ namespace GNTechnology
     {
         // consts
         private static float StepBase = 0.5f;
+        private static float _nextLogAt = 0f;
 
         public static void SetOff(in GNVisualState vs)// for initialization
         {
@@ -315,11 +316,13 @@ namespace GNTechnology
             if (emitters == null) return;
 
             // calculation for tMin/tMax
-            float levelMult = vessel.ActionGroups[KSPActionGroup.Brakes] ? Mathf.Clamp((float)vs.ThrustVector.magnitude, 0.1f, 1.0f) : level;
+            float levelMult = vessel.ActionGroups[KSPActionGroup.Brakes] ? Mathf.Clamp((float)vs.ThrustVector.magnitude, 0.1f, 1.0f) : level; // 0.05f needed for stable emission of particles for unknown reason.
 
             // seettings
             float tMin = 7000f * Mathf.Pow(levelMult, 2f);
             float tMax = 9000f * Mathf.Pow(levelMult, 2f);
+            float emissionSpeed =3500f;
+            float DynamicsEnableLevel = 0.2f;
 
             for (int i = 0; i < emitters.Length; i++)
             {
@@ -329,17 +332,35 @@ namespace GNTechnology
                 // Smoothly adjust emission rates
                 if(!e.enabled) e.enabled = true;
                 if(!e.emit) e.emit = true;
-                e.minEmission = (int)Mathf.Lerp(e.minEmission, tMin, 100f * Time.deltaTime); //10f for last
-                e.maxEmission = (int)Mathf.Lerp(e.maxEmission, tMax, 100f * Time.deltaTime);
+
+                // smooth change
+                e.minEmission = Mathf.RoundToInt(
+                    Mathf.MoveTowards(e.minEmission, tMin, emissionSpeed * Time.deltaTime)
+                );
+                e.maxEmission = Mathf.RoundToInt(
+                    Mathf.MoveTowards(e.maxEmission, tMax, emissionSpeed * Time.deltaTime)
+                );
+
+                // old code
+                //e.minEmission = (int)Mathf.Lerp(e.minEmission, tMin, 100f * Time.deltaTime); //10f for last
+                //e.maxEmission = (int)Mathf.Lerp(e.maxEmission, tMax, 100f * Time.deltaTime);
+
                 e.localVelocity = new Vector3(0f, -1 * Mathf.Lerp(5f, 45f, levelMult), 0f);
+
                 var ps = e.GetComponent<ParticleSystem>();
                 var keys = e.colorAnimation; // Color[5]
+
+                // NOTE:
+                // Shuriken ParticleSystem becomes unstable with ForceOverLifetime
+                // when particle count is too low.
+                // Dynamics is intentionally disabled at low throttle levels.
 
                 // particle coloring system
                 SetEmitterColor_PS(ps, particleColor, keys);
 
                 // particle dynamics system
-                SetEmitterDynamics_PS(ps, levelMult, vessel, vs.ThrustVector);
+                if (level > DynamicsEnableLevel) // avoid Shuriken buggy behavior when too less particle.
+                    SetEmitterDynamics_PS(ps, levelMult, vessel, vs.ThrustVector);
                 //DumpEmitter(e, "GN");
             }
         }
@@ -369,6 +390,7 @@ namespace GNTechnology
 
         private static void SetEmitterDynamics_PS(ParticleSystem ps, float level, Vessel vessel, Vector3 BackVector) //KSPParticleEmitter e
         {
+
             var main = ps.main;
             float startSpeed = 45f;
             float accelBase = 100f;
@@ -392,36 +414,34 @@ namespace GNTechnology
 
         }
 
-        private static Vector3 GetCombinedThrustVector(Vessel v, float rcsInfluence = 1.0f)
+        private static string GetPath(Transform t)
         {
-            if (v == null) return Vector3.zero;
+            if (!t) return "<null>";
+            var sb = new System.Text.StringBuilder(t.name);
+            while (t.parent)
+            {
+                t = t.parent;
+                sb.Insert(0, t.name + "/");
+            }
+            return sb.ToString();
+        }
 
-            var s = v.ctrlState;
-            Transform rt = v.ReferenceTransform;
+        private static void LogEmitter(KSPParticleEmitter e)
+        {
+            var t = e.transform;
+            Debug.Log(
+                $"[GN] Emitter id={e.GetInstanceID()} name={e.name} " +
+                $"path={GetPath(t)} " +
+                $"parent={t.parent?.name} " +
+                $"localPos={t.localPosition} worldPos={t.position} " +
+                $"lossyScale={t.lossyScale} emit={e.emit} enabled={e.enabled} " +
+                $"minE={e.minEmission} maxE={e.maxEmission} frame={Time.frameCount}"
+            );
+        }
 
-            // --- RCS入力方向（動かしたい方向） ---
-            Vector3 rcsDir =
-                rt.right * s.X +   // 左右
-                rt.forward * s.Y +   // 前後
-                rt.up * s.Z;    // 上下
-
-            // RCSは実推力方向は逆（粒子が流れる方向）
-            Vector3 rcsThrust = rcsDir * rcsInfluence;
-
-
-            // --- メイン推力方向（機体の後方）---
-            Vector3 mainThrustDir = -rt.up;  // forwardが前の機体なら rt.forward、上が前なら rt.up
-            float mainPower = s.mainThrottle;
-            Vector3 mainThrust = mainThrustDir * mainPower;
-
-
-            // --- 合成 ---
-            Vector3 thrustVector = mainThrust + rcsThrust;
-
-            if (thrustVector != Vector3.zero)
-                thrustVector.Normalize();
-
-            return thrustVector;
+        private static void LogLevel(string tag, float level)
+        {
+            Debug.Log($"[GN] {tag} level={level} frame={Time.frameCount}");
         }
 
 
