@@ -327,8 +327,8 @@ namespace GNTechnology
                 if (!e) continue;
 
                 // Smoothly adjust emission rates
-                e.enabled = true;
-                e.emit = true;
+                if(!e.enabled) e.enabled = true;
+                if(!e.emit) e.emit = true;
                 e.minEmission = (int)Mathf.Lerp(e.minEmission, tMin, 100f * Time.deltaTime); //10f for last
                 e.maxEmission = (int)Mathf.Lerp(e.maxEmission, tMax, 100f * Time.deltaTime);
                 e.localVelocity = new Vector3(0f, -1 * Mathf.Lerp(5f, 45f, levelMult), 0f);

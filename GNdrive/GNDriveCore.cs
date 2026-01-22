@@ -1168,11 +1168,13 @@ namespace GNTechnology
                 PAWActivate(ReposeFieldList);
                 PAWActivate("Repose");
                 if (IsMove)
-                    PAWActivate("MoveOn");
+                    PAWActivate("sgOn");
+                    sgOn = true;
             }
             else
             {
                 PAWActivate("accel", "DriveIndividuality", "ParticleGeneration");
+                sgOn = false;
             }
             ActionActivate(ReposeActionList);
             if (IsMove) ActionActivate("ToggleMoveOn");
@@ -1186,7 +1188,6 @@ namespace GNTechnology
             ps.ParticlePower = particlepower;
             ps.SafeGuard = false; // No need for safeguard for perpetual drive.
             ps.MaxG = accel;
-            sgOn = false;
 
             // For Twin drive
             if (!Manufactured) CompressIndividuality(ManufactureVariance);
@@ -1213,7 +1214,15 @@ namespace GNTechnology
         {
             base.OnFixedUpdate();
             SyOn = true; // force sync
-            sgOn = ps.Shortage; // power drop when particle shortage.
+
+            // Power shortage safeguard
+            if (ps.Shortage)
+                sgOn = true; // power drop when particle shortage.
+
+            // additional Engine State Control
+            MoveOn = !sgOn;
+            vs.MoveOn = MoveOn;
+            ps.SafeGuard = sgOn;
 
             // GN drive needs TD for actual work.
             if (part.Resources["GNparticle"].amount > 0 || part.Resources["TopologicalDefects"].amount >= 0.5)
