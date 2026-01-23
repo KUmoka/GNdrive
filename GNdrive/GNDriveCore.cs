@@ -1136,6 +1136,10 @@ namespace GNTechnology
         public float particlepower = 1000f;
         [KSPField(guiName = "Manufacture Variance", guiActive = true)]
         public float ManufactureVariance = 1f;
+        [KSPField(guiName = "2nd Generation", guiActive = true)]
+        public bool isSecondGen = false;
+        [KSPField(guiName = "Safety Functiuon", guiActive = true)]
+        public bool isSgOn = false;
 
         public override void OnActive()
         {
@@ -1168,16 +1172,24 @@ namespace GNTechnology
                 PAWActivate(ReposeFieldList);
                 PAWActivate("Repose");
                 if (IsMove)
+                {
+                    Debug.Log("[GN] GN Drive Move enable detected in flight PAW.");
                     PAWActivate("sgOn");
-                    sgOn = true;
+                    sgOn = true;   
+                }
             }
             else
             {
                 PAWActivate("accel", "DriveIndividuality", "ParticleGeneration");
+                Debug.Log("[GN] GN Drive Move disable detected in flight PAW.");
                 sgOn = false;
             }
             ActionActivate(ReposeActionList);
             if (IsMove) ActionActivate("ToggleMoveOn");
+
+            // check sg
+            isSgOn = sgOn;
+            Debug.Log($"[GN] GN Drive isSgOn={isSgOn}");
 
             vs.RotorSpeed = 180f; // thruster rotor speed
             engineOn = true; // GN Drive is always on.
@@ -1186,7 +1198,7 @@ namespace GNTechnology
             //vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
             vs.ParticleColor = GNColorDecider.ParticleColor(vs);
             ps.ParticlePower = particlepower;
-            ps.SafeGuard = false; // No need for safeguard for perpetual drive.
+            ps.SafeGuard = sgOn; // No need for safeguard for perpetual drive.
             ps.MaxG = accel;
 
             // For Twin drive
@@ -1215,9 +1227,12 @@ namespace GNTechnology
             base.OnFixedUpdate();
             SyOn = true; // force sync
 
-            // Power shortage safeguard
-            if (ps.Shortage)
+            // Power shortage safeguard for 1st gen drive
+            if (ps.Shortage && !isSecondGen)
                 sgOn = true; // power drop when particle shortage.
+
+            // check sg
+            isSgOn = sgOn;
 
             // additional Engine State Control
             MoveOn = !sgOn;
