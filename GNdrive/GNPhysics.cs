@@ -361,10 +361,14 @@ namespace GNTechnology
             // usual case
             if (Aadd == GNGen) return; // No EC return needed.
 
-            // particle nearly full.
+            // particle nearly full. 
             if (Aadd < GNGen) 
             {
-                ps.part.RequestResource("ElectricCharge", ECReqGen * ((Aadd - GNGen) / GNGen)); //Return unused EC
+                var ECs = ECReqGen * ((Aadd - GNGen) / GNGen);
+                if (ECs < 0) // return only when ECs is negative
+                {
+                    ps.part.RequestResource("ElectricCharge", ECs); //Return unused EC
+                }
                 return;
             }
 

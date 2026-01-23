@@ -1140,6 +1140,7 @@ namespace GNTechnology
         public bool isSecondGen = false;
         [KSPField(guiName = "Safety Functiuon", guiActive = true)]
         public bool isSgOn = false;
+        private bool TaDisabled = true; // for deactivate TRANS-AM for 2nd Gen Drive
 
         public override void OnActive()
         {
@@ -1229,7 +1230,27 @@ namespace GNTechnology
 
             // Power shortage safeguard for 1st gen drive
             if (ps.Shortage && !isSecondGen)
+            {
                 sgOn = true; // power drop when particle shortage.
+            }
+
+            // TRANS-AM enable -> TaDisabled = false, once activate TRANS-AM, TaDisabled will keep TRANS-AM On.
+            if (taOn && !ps.Shortage && !isSecondGen)
+            {
+                TaDisabled = false;
+            }
+
+            // sustain TaOn if TaDisabled is false.TaDisabled of 2nd Gen is always true. 
+            if (!ps.Shortage && !TaDisabled)
+            {
+                taOn = true;
+            }
+
+            // TaDisabled is true when power shortage
+            if (ps.Shortage)
+            {
+                TaDisabled = true;
+            }
 
             // check sg
             isSgOn = sgOn;
