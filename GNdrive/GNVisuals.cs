@@ -279,8 +279,9 @@ namespace GNTechnology
             if (lights != null)
             {
                 float baseIntensity = 10f;
+                float baseRange = 5f;
                 float targetInt = baseIntensity * level;
-                float targetRange = level;
+                float targetRange = baseRange * level;
 
                 for (int i = 0; i < lights.Length; i++)
                 {
