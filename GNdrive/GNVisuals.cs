@@ -341,16 +341,12 @@ namespace GNTechnology
                     Mathf.MoveTowards(e.maxEmission, tMax, emissionSpeed * Time.deltaTime)
                 );
 
-                // old code
-                //e.minEmission = (int)Mathf.Lerp(e.minEmission, tMin, 100f * Time.deltaTime); //10f for last
-                //e.maxEmission = (int)Mathf.Lerp(e.maxEmission, tMax, 100f * Time.deltaTime);
-
                 e.localVelocity = new Vector3(0f, -1 * Mathf.Lerp(5f, 45f, levelMult), 0f);
 
                 var ps = e.GetComponent<ParticleSystem>();
                 var keys = e.colorAnimation; // Color[5]
 
-                // NOTE:
+                // IMPORTANT NOTE:
                 // Shuriken ParticleSystem becomes unstable with ForceOverLifetime
                 // when particle count is too low.
                 // Dynamics is intentionally disabled at low throttle levels.
@@ -361,6 +357,9 @@ namespace GNTechnology
                 // particle dynamics system
                 if (level > DynamicsEnableLevel) // avoid Shuriken buggy behavior when too less particle.
                     SetEmitterDynamics_PS(ps, levelMult, vessel, vs.ThrustVector);
+                else
+                    SetEmitterDynamicsOff(ps);
+
                 //DumpEmitter(e, "GN");
             }
         }
@@ -411,7 +410,12 @@ namespace GNTechnology
             fol.x = new ParticleSystem.MinMaxCurve(vesselBackLocal.x * accel);
             fol.y = new ParticleSystem.MinMaxCurve(vesselBackLocal.y * accel);
             fol.z = new ParticleSystem.MinMaxCurve(vesselBackLocal.z * accel);
+        }
 
+        private static void SetEmitterDynamicsOff(ParticleSystem ps)
+        {
+            var fol = ps.forceOverLifetime;
+            fol.enabled = false;
         }
 
         private static string GetPath(Transform t)
@@ -425,25 +429,6 @@ namespace GNTechnology
             }
             return sb.ToString();
         }
-
-        private static void LogEmitter(KSPParticleEmitter e)
-        {
-            var t = e.transform;
-            Debug.Log(
-                $"[GN] Emitter id={e.GetInstanceID()} name={e.name} " +
-                $"path={GetPath(t)} " +
-                $"parent={t.parent?.name} " +
-                $"localPos={t.localPosition} worldPos={t.position} " +
-                $"lossyScale={t.lossyScale} emit={e.emit} enabled={e.enabled} " +
-                $"minE={e.minEmission} maxE={e.maxEmission} frame={Time.frameCount}"
-            );
-        }
-
-        private static void LogLevel(string tag, float level)
-        {
-            Debug.Log($"[GN] {tag} level={level} frame={Time.frameCount}");
-        }
-
 
         private static void UpdateRotor(Transform[] rotors, float rotorspeed, float level)// rotate rotors, note that this sub itself doesn't depends on previous state.
         {

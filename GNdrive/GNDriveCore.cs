@@ -843,7 +843,7 @@ namespace GNTechnology
             taOn = false;
             accel = 0f;
             ECOn = false;
-            sgOn = false;
+            sgOn = true; // when repose, drive should be safe state.
             SyOn = false;
         }
         
