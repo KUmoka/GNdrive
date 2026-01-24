@@ -399,7 +399,14 @@ namespace GNTechnology
                 return;
             }
 
-            // Refilled is ready for active.
+            // Refil Check
+            if (ES == DriveState.Depleted)
+            {
+                engineOn = false;
+                return;
+            }
+
+            // Drive is doing job here.
             if (engineOn)
             {
                 PhysicsUpdateSupport();
