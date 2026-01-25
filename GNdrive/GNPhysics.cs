@@ -93,6 +93,7 @@ namespace GNTechnology
             float TotalParticlePower = 0f;
             float TotalParticleGenRate = 0f;
             float limitFactor = 1f;
+            float actualLimitFactor = 1f;
             float accelMag = 0f;
             int driveCount = 0, agCount = 0, hvCount = 0, taCount = 0, pgdrive = 0;
 
@@ -205,19 +206,59 @@ namespace GNTechnology
             TotalParticlePower *= TimeWarp.fixedDeltaTime; // compensation for consumption
             TotalParticleGenRate *= TimeWarp.fixedDeltaTime; // compensation for consumption
 
-            // limit factor calculation. When particle generation on, drive power should suppress sustainable level
-            if (ps.SafeGuard)
+            //// limit factor calculation. When particle generation on, drive power should suppress sustainable level
+            //if (ps.SafeGuard)
+            //{
+            //    if (consumption > 0 && consumption > ps.ParticleGenRate)
+            //    {
+            //        limitFactor = (float) ps.ParticleGenRate / (float) consumption;
+            //    }
+            //}
+            //else
+            //{
+            //    if (consumption > 0)
+            //    {
+            //        limitFactor = (float)(TotalParticlePower/consumption);
+            //    }
+            //}
+
+            //if (ps.SafeGuard)
+            //{
+            //    if (consumption > 0 && consumption > ps.UsedGNParticle) limitFactor =(float)(ps.UsedGNParticle / consumption);
+            //}
+            //else
+            //{
+            //    // Drive only, same as SafeGuard.on, but with thruster/condenser drive, limitFactor will increase.
+            //    if (consumption > 0 && consumption > TotalParticlePower) limitFactor = (float)(TotalParticlePower / consumption);
+            //}
+
+            // consume particle
+            //double consume = consumption * (double)limitFactor;
+
+            // Particle Consumption calculation with SafeGuard and generation consideration
+            double consume = 0f;
+
+            if(ps.SafeGuard)
             {
-                if (consumption > 0 && consumption > ps.UsedGNParticle) limitFactor =(float)(ps.UsedGNParticle / consumption);
+                if (consumption > 0 && consumption > ps.ParticleGenRate)
+                {
+                    limitFactor = (float) ps.ParticleGenRate / (float) consumption;
+                    consume = ps.ParticleGenRate;
+                }
+                else
+                {
+                    limitFactor = 1f;
+                    consume = consumption;
+                }
             }
             else
             {
-                // Drive only, same as SafeGuard.on, but with thruster/condenser drive, limitFactor will increase.
-                if (consumption > 0 && consumption > TotalParticlePower) limitFactor = (float)(TotalParticlePower / consumption);
+                // SafeGuard off, no generation consideration
+                limitFactor = 1f;
+                consume = consumption;
             }
 
-            // consume particle
-            double consume = consumption * (double)limitFactor;
+            // GN particle actual consumption
             double actualConsumption = ps.part.RequestResource("GNparticle", consume);
             if (actualConsumption < consume - epsilon)
             {
@@ -225,6 +266,8 @@ namespace GNTechnology
                 ps.TaOn = false; // TRANS-AM off
                 Debug.Log("GNparticle Shortage: AC=" + actualConsumption);
                 Debug.Log("GNparticle Shortage: Con=" + consume + epsilon);
+                actualLimitFactor = (float)(actualConsumption / consume);
+                limitFactor = actualLimitFactor; // re-adjust limit factor according to actual consumption
             }
             else
             {
