@@ -171,6 +171,10 @@ namespace GNTechnology
         [KSPField(guiActive = false, guiActiveEditor = false, guiName = "Synchronize Target Drive", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
         public bool SyOn = false;
 
+        // RCS
+        [KSPField(guiActive = false, guiActiveEditor = false, guiName = "RCS Power Ratio", isPersistant = true), UI_FloatRange(minValue = 0f, maxValue = 1f, stepIncrement = 0.05f)]
+        public float RCSpower = 1f;
+
         // For added actions
         [KSPField(guiActive = false, guiActiveEditor = false, guiName = "GN Repose", isPersistant = true), UI_Toggle(disabledText = "OFF", enabledText = "ON")]
         public bool Repose = false;
@@ -218,7 +222,7 @@ namespace GNTechnology
         [KSPField(guiActiveEditor = true, guiActive = true, isPersistant = true, guiName = "Accel Divided")]
         public float AccelDiv = 1f;
         [KSPField(guiActiveEditor = true, guiActive = true, isPersistant = true, guiName = "Synchronize Rate")]
-        public float SynchronizeRate = 0f;
+        public float SynchronizeRate = 1f;
 
         // sound
         private float soundMinVolume = 0.2f;
@@ -377,12 +381,6 @@ namespace GNTechnology
             // Editor, no need for PG
             if (!HighLogic.LoadedSceneIsFlight || vessel == null) 
                 return;
-
-            // Time Warp, particle generation continues in timewarp.
-            // Check if vessel is packed when not in timewarp...---------------------------------------------------------------------------------------------------------------------------------------------------
-            if (vessel.packed)
-                ps.ECOn = ECOn;
-                GNGenerationFurnace.ParticleSupply(ref ps, TimeWarp.deltaTime);
         }
 
         private void ParticleGenerationFixedUpdate()
@@ -424,6 +422,7 @@ namespace GNTechnology
             ps.ParticleGenRate = ParticleGeneration;
             ps.ECOn = ECOn;
             ps.SafeGuard = sgOn;
+            ps.RCSFactor = RCSpower;
             GNPhysics.UpdatePhysics(ref ps);
             DriveStateReflection();
         }
@@ -688,6 +687,7 @@ namespace GNTechnology
 
             // added fields
             Hide("Repose");
+            Hide("RCSpower");
         }
         private void ActionInitialization()
         {
@@ -892,7 +892,7 @@ namespace GNTechnology
             part.stagingIconAlwaysShown = true;
             part.stagingOn = true;
 
-            ReposeFieldList = new string[] { "engineOn", "accel", "ESDisplay" };
+            ReposeFieldList = new string[] { "engineOn", "accel", "ESDisplay", "RCSpower" };
             ReposeActionList = new string[] { "ToggleEngineAction", "IncreaseMaxGAction", "DecreaseMaxGAction" };
 
             // PAW and Action setup
@@ -963,7 +963,7 @@ namespace GNTechnology
             part.stagingOn = true;
 
             // PAW and Action setup
-            ReposeFieldList = new string[] { "engineOn", "agOn", "hvOn", "accel", "ESDisplay" };
+            ReposeFieldList = new string[] { "engineOn", "agOn", "hvOn", "accel", "ESDisplay", "RCSpower" };
             ReposeActionList = new string[] { "ToggleEngineAction", "ToggleAgAction", "ToggleHvAction", "IncreaseMaxGAction", "DecreaseMaxGAction" };
 
             if (HighLogic.LoadedSceneIsFlight)
@@ -1042,7 +1042,7 @@ namespace GNTechnology
             part.stagingOn = true;
 
             // PAW and Action setup
-            ReposeFieldList = new string[] { "agOn", "hvOn", "accel", "SyOn", "ECOn", "sgOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay" };
+            ReposeFieldList = new string[] { "agOn", "hvOn", "accel", "SyOn", "ECOn", "sgOn", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay", "RCSpower" };
             ReposeActionList = new string[] { "ToggleEngineAction", "ToggleAgAction", "ToggleHvAction", "IncreaseMaxGAction", "DecreaseMaxGAction", "ToggleECAction", "ToggleSgAction", "ToggleSyAction" };
 
             if (HighLogic.LoadedSceneIsFlight)
@@ -1172,7 +1172,7 @@ namespace GNTechnology
             part.force_activate();
 
             // PAW and Action setup
-            ReposeFieldList = new string[] { "agOn", "hvOn", "taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay" };
+            ReposeFieldList = new string[] { "agOn", "hvOn", "taOn", "accel", "DriveIndividuality", "SynchronizeRate", "ParticleGeneration", "ESDisplay", "RCSpower" };
             ReposeActionList = new string[] { "ToggleEngineAction", "ToggleAgAction", "ToggleHvAction", "IncreaseMaxGAction", "DecreaseMaxGAction" };
 
             if (HighLogic.LoadedSceneIsFlight)

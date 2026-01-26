@@ -24,6 +24,7 @@ namespace GNTechnology
         public float ParticlePower; // Max power of the drive can exert
         public float ParticleGenRate; // particle generation rate
         public float MaxG; // for max acceleration.
+        public float RCSFactor; // RCS factor for thruster drives.
         public double UsedGNParticle; // amount of GN particle used in last update.
 
         //Twin drive parameter
@@ -89,7 +90,7 @@ namespace GNTechnology
             float y = -cs.Y;
             float x = -cs.X;
             float z = -cs.Z;
-            float actualG = ps.MaxG * 9.8f; // m/s^2
+            float actualG = ps.MaxG * 9.8f; // m/s^2, theoretical max accel
             float TotalParticlePower = 0f;
             float TotalParticleGenRate = 0f;
             float limitFactor = 1f;
@@ -110,7 +111,7 @@ namespace GNTechnology
             var up = vessel.ReferenceTransform.up;
             var fwd = vessel.ReferenceTransform.forward;
             var rgt = vessel.ReferenceTransform.right;
-            Vector3 ThrustDirection = up * z * w + fwd * y * w + rgt * x * w + up * throttle;
+            Vector3 ThrustDirection = ps.RCSFactor * (up * z * w + fwd * y * w + rgt * x * w) + up * throttle;//throttle will be remapped later.
             Vector3 gee = FlightGlobals.getGeeForceAtPosition(vessel.transform.position); // m/s^2
 
             // Hover acceleration calculation
@@ -132,6 +133,9 @@ namespace GNTechnology
             float BrakeMag = (speed == 1) ? 0.05f : 1f; // 0.05f is speed is less than 1m/s
             //if (speed == 1) BrakeMag = 0.05f;// speed == 1 is clamp active case.
             Vector3 brakeDir = -vSrf / speed; // unit vector until speed < 1
+
+            // debug
+            Debug.Log("GN Drive Update: Initialized");
 
             // Find active drives per functions.
             foreach (Part p1 in vessel.parts)
@@ -185,7 +189,10 @@ namespace GNTechnology
             TotalParticleGenRate += ps.ParticleGenRate * (ps.SyncRate - 1);
 
             // hv > ag, disable ag when hv > 0
-            if (hvCount > 0) ps.AgOn = false;
+            if (hvCount > 0)
+            {
+                ps.AgOn = false;
+            }
 
             // TRANS-AM mode adjustments
             if (ps.TaOn)
@@ -194,36 +201,52 @@ namespace GNTechnology
                 TotalParticlePower += 2f * ps.ParticlePower * ps.SyncRate; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
             }
 
+            // debug
+            Debug.Log("GN Drive Update: CountedDrives");
+
             // Resource drain calculation
-            double mass = vessel.GetTotalMass(); // KSP1.12はdouble
-
-            // Base Thrust, if one adds another force, one shall add like Ag/Hv
-            float support = (ps.AgOn ? gLocal : 0f) + (ps.HvOn ? aHover : 0f); // Hv, Ag accel considered here.
-            accelMag = (brakes ? brakeDir.magnitude * BrakeMag : ThrustDirection.magnitude) * (actualG - support) + support; // m/s^2, ternary operator
-
-            // consumption calculation
-            double consumption = mass * Math.Abs(accelMag) * TimeWarp.fixedDeltaTime; //now include hover consumption, 1G. This is ideal consumption, not include drive limit factor yet.
             TotalParticlePower *= TimeWarp.fixedDeltaTime; // compensation for consumption
             TotalParticleGenRate *= TimeWarp.fixedDeltaTime; // compensation for consumption
+            double mass = vessel.GetTotalMass(); // KSP1.12はdouble
+            double UnitConsumption = mass * TimeWarp.fixedDeltaTime; ; // unit particle consumption for Accel=1m/s^2 per second
             double particleGenRateDelta = ps.ParticleGenRate * TimeWarp.fixedDeltaTime;// compensation for consumption
+            double particlePowerDelta = ps.ParticlePower * TimeWarp.fixedDeltaTime;// compensation for consumption
 
-            // Particle Consumption calculation with SafeGuard and generation consideration
-            double consume = 0f;
-            limitFactor = 1f; // default consume setting.
-            consume = consumption; // default consume setting.
+            // Actual acceleration magnitude calculation
+            double AccelLimit = ((ps.TaOn ? ps.ParticlePower * 3 : ps.ParticlePower) * ps.SyncRate) * TimeWarp.fixedDeltaTime / UnitConsumption; // m/s^2, max accel that drive can provide. Twin-drive sync rate considered here.
 
-            // case need > TPP 
-            if (consumption > 0 && consumption > TotalParticlePower)
+            // support calculation
+            float agSupport = (ps.AgOn && agCount > 0) ? gLocal / agCount : 0f;
+            float hvSupport = (ps.HvOn && hvCount > 0) ? aHover / hvCount : 0f;
+            float support = agSupport + hvSupport;
+            //float support = (ps.AgOn ? gLocal : 0f) + (ps.HvOn ? aHover : 0f); // Hv, Ag accel considered here.
+            double ThrustBudget = Mathf.Max(0f, (float)AccelLimit - support); // m/s^2, max thrust budget after Hv, Ag considered.if not enough, 0.
+            double NeededThrustBudget = Math.Min(ThrustBudget, actualG); // m/s^2, needed thrust budget according to actualG.
+
+            // debug
+            Debug.Log("GN Drive Update: AccelLimit=" + AccelLimit + ", Support=" + support + ", ThrustBudget=" + ThrustBudget + ", NeededThrustBudget=" + NeededThrustBudget);
+
+            // if not enough power for Hv and Ag, limitFactor will be less than 1f.
+            if (support > 0)
             {
-                limitFactor = TotalParticlePower / (float)consumption; // initial limit factor based on total particle power. Particle Consume can't exceed drive power itself
-                consume = consumption * (double)limitFactor;
+                limitFactor = Mathf.Min((float)AccelLimit / support, 1f);
             }
 
-            // case sagfeguard on, less than TPP
+            // Ag, Hv > Brake > thrust, priority order.
+            double consumption = Math.Min((double)support * UnitConsumption, particlePowerDelta) ; // first, consume for hover and anti-gravity.if not enough power, consume all power for them.
+            consumption += NeededThrustBudget * ThrustDirection.magnitude * UnitConsumption;  // then, consume for thrust or brakes....most of the time, consumption will be = to ps.ParticlePower. Also, throttle is applied here.           
+
+            // debug
+            Debug.Log("GN Drive Update: Consumption=" + consumption + ", ParticlePowerDelta=" + particlePowerDelta + ", UnitConsumption=" + UnitConsumption);
+
+            // Particle Consumption calculation with SafeGuard and generation consideration
+            double consume = consumption; // Basic assumption
+
+            // case sagfeguard on
             if (ps.SafeGuard && consumption > 0)
             {
                 consume = (double)Mathf.Clamp((float)consumption, 0f, (float)particleGenRateDelta);
-                limitFactor = (float)particleGenRateDelta / (float)consumption;
+                limitFactor = Mathf.Min((float)particleGenRateDelta / (float)consumption, 1f); // usually, drive exert all the power. so it will be = ps.particleGenRate/ps.particlePower.
             }
 
             // GN particle actual consumption
@@ -271,7 +294,7 @@ namespace GNTechnology
                 }
 
                 // Hover calculation.
-                if (ps.HvOn && aHover > 0f)
+                if (ps.HvOn && aHover > 0)
                 {
                     float forceN = aHover * p2.rb.mass * limitFactor;  // [N] = [m/s^2] * [kg]
                     p2.AddForce(upHv * forceN / hvCount);
@@ -281,11 +304,8 @@ namespace GNTechnology
                     aHover = 0f;
                 }
 
-                // Main thrust or brakes, it shouldn't be less than 0
-                float ThrustBudget = Mathf.Max(0f, actualG - aHover - gLocal);
-
-                // Calc force
-                p2.AddForce((brakes ? brakeDir * BrakeMag : ThrustDirection) * ThrustBudget * limitFactor * p2.rb.mass);
+                //// Calc force
+                p2.AddForce((brakes ? brakeDir * BrakeMag : ThrustDirection) * (float)NeededThrustBudget * limitFactor * p2.rb.mass);
             }
 
             ps.ThrustDir = (brakes ? brakeDir : ThrustDirection);
