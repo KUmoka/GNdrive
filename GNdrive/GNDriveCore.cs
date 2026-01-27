@@ -230,6 +230,14 @@ namespace GNTechnology
         private float soundMinPitch = 0.4f;
         private float soundMaxPitch = 1.0f;
 
+        public void Update()
+        {
+            if (engineOn)
+            {
+                part.force_activate();
+            }
+        }
+
         public override void OnAwake()
         {
             base.OnAwake();
@@ -309,6 +317,9 @@ namespace GNTechnology
 
         private void PhysicsInit()// OnStart
         {
+            //debug
+            Debug.Log("[GN] PhysicsInit called.");
+
             ps.part = part;
             ps.ParticlePower = 1f; // default nonzero negligible value. 
             ps.UsedGNParticle = ps.ParticleGenRate; // initialize used particle rate.
@@ -407,6 +418,7 @@ namespace GNTechnology
             // Drive is doing job here.
             if (engineOn)
             {
+                Debug.Log("[GN] Physics Update called.");
                 PhysicsUpdateSupport();
                 return;
             }
@@ -806,9 +818,10 @@ namespace GNTechnology
 
         private void InitRepose()
         {
-            Repose = false;
+            Repose = false; // engine will on when Repose is false at start.
             previousRepose = Repose;
             previousGNSystemState = GNSystemState.Empty; // need initialization to work?
+            engineOn = false;
         }
 
         private void UpdateRepose()
@@ -1059,6 +1072,11 @@ namespace GNTechnology
                     ECOn = true;
                 }
                 PAWActivate("Repose");
+                if (IsMove)
+                {
+                    Debug.Log("[GN] GN Drive Move enable detected in flight PAW.");
+                    sgOn = true;
+                }
             }
             else
             {
