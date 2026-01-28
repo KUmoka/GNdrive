@@ -1218,7 +1218,7 @@ namespace GNTechnology
             Debug.Log($"[GN] GN Drive isSgOn={isSgOn}");
 
             vs.RotorSpeed = 180f; // thruster rotor speed
-            engineOn = true; // GN Drive is always on.
+            // engineOn = true; // GN Drive is always on.
             ECOn = true; // GN Drive generates EC through EC consumption calculation method.
             vs.Mode = GNVisualMode.Drive;
             //vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
