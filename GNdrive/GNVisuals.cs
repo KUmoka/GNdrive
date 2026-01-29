@@ -70,7 +70,6 @@ namespace GNTechnology
     {
         // consts
         private static float StepBase = 0.5f;
-        private static float _nextLogAt = 0f;
 
         public static void SetOff(in GNVisualState vs)// for initialization
         {

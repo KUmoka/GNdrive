@@ -544,12 +544,17 @@ namespace GNTechnology
         // Actual Effects
         private GNfieldSurfaceModule _field;
 
-        public override void OnStart(StartState state)
+        public override void OnActive()
         {
-            base.OnStart(state);
+            base.OnActive();
 
             // system activate
             part.force_activate();
+        }
+
+        public override void OnStart(StartState state)
+        {
+            base.OnStart(state);
 
             // Particle Color Initialization
             fresnelColor = part.Modules.GetModule<GNBaseSystem>()?.vs.ParticleColor ?? new Color(0f, 1f, 170f / 255f, 1f);

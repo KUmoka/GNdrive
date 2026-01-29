@@ -70,7 +70,7 @@ namespace GNTechnology
                 }
             }
 
-            Debug.Log($"GNLists: Thruster={GNThruster.Count}, CondenserDrive={GNCondernserDrive.Count}, DriveTau={GNDriveTau.Count}, Drive={GNDrive.Count}, Shield={GNShield.Count}");
+            // Debug.Log($"GNLists: Thruster={GNThruster.Count}, CondenserDrive={GNCondernserDrive.Count}, DriveTau={GNDriveTau.Count}, Drive={GNDrive.Count}, Shield={GNShield.Count}");
         }
     }
 

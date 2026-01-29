@@ -479,9 +479,12 @@ namespace GNTechnology
                 ES = DriveState.Unsynchronized;
                 return;
             }
-            
+
             // case Depleted.
-            if (ES == DriveState.Depleted) return;
+            if (ES == DriveState.Depleted)
+            {
+                return;
+            } 
 
             // case Engine on by user
             if (engineOn)
@@ -843,7 +846,10 @@ namespace GNTechnology
 
         private void UpdateRepose()
         {
-            if (previousRepose == Repose) return; // no change
+            if (previousRepose == Repose)
+            {
+                return; // no change
+            }
             if (Repose)
             {
                 PAWDeactivate(ReposeFieldList);

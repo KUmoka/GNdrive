@@ -72,7 +72,6 @@ namespace GNTechnology
             if (ps.part == null) return;
         }
 
-        [Obsolete]
         public static void UpdatePhysics(ref GNPhysicsState ps)
         {
             // --- Basic NRE prevention ---
@@ -95,7 +94,6 @@ namespace GNTechnology
             float TotalParticleGenRate = 0f;
             float limitFactor = 1f;
             float actualLimitFactor = 1f;
-            float accelMag = 0f;
             int driveCount = 0, agCount = 0, hvCount = 0, taCount = 0, pgdrive = 0;
 
             // Normalize input vector
