@@ -213,6 +213,9 @@ namespace GNTechnology
         public float DriveIndividuality = -1f;
         [KSPField(guiActiveEditor = false, guiActive = false, isPersistant = true, guiName = "Manufactured")]
         public bool Manufactured = false;
+        [KSPField(guiActiveEditor = false, guiActive = false, isPersistant = true, guiName = "PreLaunched")]
+        public bool PreLaunched = false;
+        private bool IsActivated = false;
 
         // Emissive Color Changer field
         [KSPField(guiActive = true, guiName = "Tau / GN Count")]
@@ -230,19 +233,23 @@ namespace GNTechnology
         private float soundMinPitch = 0.4f;
         private float soundMaxPitch = 1.0f;
 
+        // debug variables
+        private bool _lastEngineOn;
+
         public void Update()
         {
-            if (engineOn)
+            if (engineOn && !IsActivated)
             {
                 part.force_activate();
+                IsActivated = true;
             }
         }
 
-        public override void OnAwake()
-        {
-            base.OnAwake();
-            part.enabled = true;
-        }
+        //public override void OnAwake()
+        //{
+        //    base.OnAwake();
+        //    part.enabled = true;
+        //}
 
         public override void OnCopy(PartModule fromModule)
         {
@@ -272,8 +279,11 @@ namespace GNTechnology
             // Repose related initialization
             InitRepose();
 
-            // System Initialize
+            // Debug System Initialize
+            _lastEngineOn = engineOn;
             Debug.Log("[GN] SystemInit Completed.");
+            Debug.Log($"[GN] Base Engine online = {engineOn}");
+            Debug.Log($"[GN] OnStart state={state} engineOn={engineOn}");
         }
 
         public override void OnUpdate()
@@ -293,6 +303,14 @@ namespace GNTechnology
 
             // Repose Update
             UpdateRepose();
+
+            // debug
+            if (engineOn != _lastEngineOn)
+            {
+                Debug.Log($"[GN] engineOn changed {_lastEngineOn} -> {engineOn}  scene={HighLogic.LoadedScene}  partState={part.State}");
+                Debug.Log(Environment.StackTrace); // 参考：完全ではないけど手がかりになることがある
+                _lastEngineOn = engineOn;
+            }
         }
 
         public override void OnFixedUpdate()
@@ -418,7 +436,6 @@ namespace GNTechnology
             // Drive is doing job here.
             if (engineOn)
             {
-                Debug.Log("[GN] Physics Update called.");
                 PhysicsUpdateSupport();
                 return;
             }
@@ -878,6 +895,20 @@ namespace GNTechnology
             sgOn = previousGNSystemState.SafetyGuardOn;
             SyOn = previousGNSystemState.SynchronizeOn;
         }
+
+        protected void PreLaunchSetup()
+        {
+            if (PreLaunched) return; // already prelaunched
+            engineOn = false;
+            agOn = false;
+            hvOn = false;
+            taOn = false;
+            accel = 0f;
+            ECOn = false;
+            sgOn = true; // safe state
+            SyOn = false;
+            PreLaunched = true;
+        }
     }
 
     public class GNThrusterSystem : GNBaseSystem // GN thrusters
@@ -933,6 +964,12 @@ namespace GNTechnology
 
             // Debug
             Debug.Log($"[GN] vs.Mode={vs.Mode}");
+
+            // PreLaunch setup
+            PreLaunchSetup();
+
+            // Debug
+            Debug.Log($"[GN] Engine online = {engineOn}");
         }
 
         public override void OnUpdate()
@@ -1002,6 +1039,12 @@ namespace GNTechnology
 
             // Debug
             Debug.Log($"[GN] vs.Mode={vs.Mode}");
+
+            // PreLaunch setup
+            PreLaunchSetup();
+
+            // Debug
+            Debug.Log($"[GN] Engine online = {engineOn}");
         }
 
         public override void OnUpdate()
@@ -1101,6 +1144,12 @@ namespace GNTechnology
 
             // Debug
             Debug.Log($"[GN] vs.Mode={vs.Mode}");
+
+            // PreLaunch setup
+            PreLaunchSetup();
+
+            // Debug
+            Debug.Log($"[GN] Engine online = {engineOn}");
         }
 
         public override void OnUpdate()

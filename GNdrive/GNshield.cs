@@ -221,7 +221,7 @@ namespace GNTechnology
 
                         // CoMからの距離を計算
                         float distance = Vector3.Distance(worldCoM, corner);
-                        Debug.Log("[GN] Part: " + p.partInfo.title + ", Renderer: " + renderer.name + ", Corner: " + corner.ToString("F2") + ", Distance from CoM: " + distance.ToString("F2") + " m");
+                        //Debug.Log("[GN] Part: " + p.partInfo.title + ", Renderer: " + renderer.name + ", Corner: " + corner.ToString("F2") + ", Distance from CoM: " + distance.ToString("F2") + " m");
 
                         // 最大距離を更新
                         if (distance > maxDistance && distance < 1000)

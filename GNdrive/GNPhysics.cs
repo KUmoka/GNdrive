@@ -134,9 +134,6 @@ namespace GNTechnology
             //if (speed == 1) BrakeMag = 0.05f;// speed == 1 is clamp active case.
             Vector3 brakeDir = -vSrf / speed; // unit vector until speed < 1
 
-            // debug
-            Debug.Log("GN Drive Update: Initialized");
-
             // Find active drives per functions.
             foreach (Part p1 in vessel.parts)
             {
@@ -201,9 +198,6 @@ namespace GNTechnology
                 TotalParticlePower += 2f * ps.ParticlePower * ps.SyncRate; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
             }
 
-            // debug
-            Debug.Log("GN Drive Update: CountedDrives");
-
             // Resource drain calculation
             TotalParticlePower *= TimeWarp.fixedDeltaTime; // compensation for consumption
             TotalParticleGenRate *= TimeWarp.fixedDeltaTime; // compensation for consumption
@@ -223,9 +217,6 @@ namespace GNTechnology
             double ThrustBudget = Mathf.Max(0f, (float)AccelLimit - support); // m/s^2, max thrust budget after Hv, Ag considered.if not enough, 0.
             double NeededThrustBudget = Math.Min(ThrustBudget, actualG); // m/s^2, needed thrust budget according to actualG.
 
-            // debug
-            Debug.Log("GN Drive Update: AccelLimit=" + AccelLimit + ", Support=" + support + ", ThrustBudget=" + ThrustBudget + ", NeededThrustBudget=" + NeededThrustBudget);
-
             // if not enough power for Hv and Ag, limitFactor will be less than 1f.
             if (support > 0)
             {
@@ -235,9 +226,6 @@ namespace GNTechnology
             // Ag, Hv > Brake > thrust, priority order.
             double consumption = Math.Min((double)support * UnitConsumption, particlePowerDelta) ; // first, consume for hover and anti-gravity.if not enough power, consume all power for them.
             consumption += NeededThrustBudget * ThrustDirection.magnitude * UnitConsumption;  // then, consume for thrust or brakes....most of the time, consumption will be = to ps.ParticlePower. Also, throttle is applied here.           
-
-            // debug
-            Debug.Log("GN Drive Update: Consumption=" + consumption + ", ParticlePowerDelta=" + particlePowerDelta + ", UnitConsumption=" + UnitConsumption);
 
             // Particle Consumption calculation with SafeGuard and generation consideration
             double consume = consumption; // Basic assumption
