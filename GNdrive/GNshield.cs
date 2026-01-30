@@ -547,9 +547,6 @@ namespace GNTechnology
         public override void OnActive()
         {
             base.OnActive();
-
-            // system activate
-            part.force_activate();
         }
 
         public override void OnStart(StartState state)

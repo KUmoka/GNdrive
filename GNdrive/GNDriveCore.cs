@@ -245,12 +245,6 @@ namespace GNTechnology
             }
         }
 
-        //public override void OnAwake()
-        //{
-        //    base.OnAwake();
-        //    part.enabled = true;
-        //}
-
         public override void OnCopy(PartModule fromModule)
         {
             // for symmetric placement
