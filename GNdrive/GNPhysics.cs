@@ -356,6 +356,8 @@ namespace GNTechnology
 
     public static class GNGenerationFurnace
     {
+        // Edge case problemhere. later fix!
+
         private static double difficulty = 0.1f;
 
         public static void ParticleSupply(ref GNPhysicsState ps, double dt)

@@ -1071,8 +1071,6 @@ namespace GNTechnology
         [KSPField(guiName = "Manufacture Variance", guiActive = true)]
         public float ManufactureVariance = 0.5f;
 
-        private bool Dep;
-
         public override void OnActive()
         {
             base.OnActive();
@@ -1174,18 +1172,14 @@ namespace GNTechnology
                 return; // engine won't stop
             }
 
-            Dep = EngineDepleted();
-            if (Dep) ps.EngineState = false;
-            if (part.Resources["GNparticle"].amount < 1)
+            // DeplitionCheck
+            if (EngineDepleted())
             {
-                ps.GNdepleted = true;
-                ES = DriveState.Depleted;
+                ps.EngineState = false;
             }
-            if (part.Resources["GNparticle"].amount == part.Resources["GNparticle"].maxAmount && ps.GNdepleted)
-            {
-                ps.GNdepleted = false;
-                ES = DriveState.Refilled;// now enable engine On.
-            }
+
+            // Update Engine State based on GNparticle resource
+            ES = ParticleDepletionState(part.Resources["GNparticle"].amount, part.Resources["GNparticle"].maxAmount, ref ps, ES);
         }
 
         public override void OnFixedUpdate()
@@ -1195,8 +1189,30 @@ namespace GNTechnology
 
         private bool EngineDepleted()
         {
-            if (ps.GNdepleted && part.Resources["GNparticle"].amount < part.Resources["GNparticle"].maxAmount) return true;
+            if (ps.GNdepleted && part.Resources["GNparticle"].amount < part.Resources["GNparticle"].maxAmount)
+            {
+                return true;
+            } 
+
             return false;
+        }
+
+        private DriveState ParticleDepletionState(double amount, double maxAmount, ref GNPhysicsState ps, DriveState PreviousES)
+        {
+            if (amount < 1)
+            {
+                ps.GNdepleted = true;
+                return DriveState.Depleted;
+            }
+            else if (amount >= maxAmount && ps.GNdepleted)
+            {
+                ps.GNdepleted = false;
+                return DriveState.Refilled;
+            }
+            else
+            {
+                return PreviousES;
+            }
         }
     }
 
