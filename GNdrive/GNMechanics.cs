@@ -180,7 +180,7 @@ namespace GNTechnology
                 LhvOn = false,
                 LECOn = false,
                 LSgOn = false,
-                MaxG = 0f,
+                MaxG = 0f
             };
 
             // ★ 比較メソッド（Equals）
@@ -281,8 +281,14 @@ namespace GNTechnology
                     // engineOn, ECOn, SgOn are not used in GNDriveSystem
                     m.agOn = OnOffLst.LagOn;
                     m.hvOn = OnOffLst.LhvOn;
-                    m.taOn = OnOffLst.LtaOn;
                     m.accel = OnOffLst.MaxG;
+                    m.sgOn = OnOffLst.LSgOn;
+
+                    // TA for 1st Gen
+                    if (!m.TaDisabled)
+                    {
+                        m.taOn = OnOffLst.LtaOn;
+                    }
 
                     // List.add
                     deviation.Add(m.DriveIndividuality);

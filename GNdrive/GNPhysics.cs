@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Principal;
 using UnityEngine;
 using UnityEngine.Scripting;
+using VehiclePhysics;
 using static FinePrint.ContractDefs;
 
 namespace GNTechnology
@@ -67,6 +68,42 @@ namespace GNTechnology
 
     public static class GNPhysics
     {
+        // for force calculation
+        private struct ForceContext
+        {
+            public bool AgOn, HvOn, Brakes;
+            public int AgCount, HvCount;
+            public float LimitFactor;
+            public float GLocal;
+            public float AHover;
+            public Vector3 UpHv;
+            public Vector3 BrakeDir;
+            public float BrakeMag;
+            public Vector3 ThrustDir;
+            public float NeededThrustBudget;
+
+            private static ForceContext Empty => new ForceContext
+            {
+                AgOn = false,
+                HvOn = false,
+                Brakes = false,
+                AgCount = 0,
+                HvCount = 0,
+                LimitFactor = 1f,
+                GLocal = 0f,
+                AHover = 0f,
+                UpHv = Vector3.zero,
+                BrakeDir = Vector3.zero,
+                BrakeMag = 0f,
+                ThrustDir = Vector3.zero,
+                NeededThrustBudget = 0f
+            };
+        }
+
+        // FP error avoidance
+        private static double epsilon = 1e-2;
+        private static double fraction = 1e-3;
+
         public static void SetOff(in GNPhysicsState ps)
         {
             if (ps.part == null) return;
@@ -90,11 +127,8 @@ namespace GNTechnology
             float x = -cs.X;
             float z = -cs.Z;
             float actualG = ps.MaxG * 9.8f; // m/s^2, theoretical max accel
-            float TotalParticlePower = 0f;
-            float TotalParticleGenRate = 0f;
             float limitFactor = 1f;
-            float actualLimitFactor = 1f;
-            int driveCount = 0, agCount = 0, hvCount = 0, taCount = 0, pgdrive = 0;
+            int agCount = 0, hvCount = 0;
 
             // Normalize input vector
             float norm = Mathf.Sqrt(x * x + y * y + z * z);
@@ -120,9 +154,6 @@ namespace GNTechnology
             float aMax = Mathf.Max(0f, ps.MaxG * 9.80665f);// ユーザー設定上限（例：MaxG[G] → [m/s^2]へ換算）ps.MaxG が 1=1G といった意味なら：
             float aHover = ps.HvOn ? ComputeHoverAccel(vVert, gLocal, Time.fixedDeltaTime, aMax) : 0f;// ホバー用の上向き必要加速度を1回だけ計算  
 
-            // FP error avoidance
-            double epsilon = 1e-2;
-
             // Break calculation.
             bool brakes = vessel.ActionGroups[KSPActionGroup.Brakes];
             Vector3 vSrf = (Vector3)vessel.srf_velocity;
@@ -132,56 +163,7 @@ namespace GNTechnology
             //if (speed == 1) BrakeMag = 0.05f;// speed == 1 is clamp active case.
             Vector3 brakeDir = -vSrf / speed; // unit vector until speed < 1
 
-            // Find active drives per functions.
-            foreach (Part p1 in vessel.parts)
-            {
-                foreach (PartModule m in p1.Modules)
-                {
-                    if (m is GNCondenserDriveSystem c && c.ps.EngineState)
-                    {
-                        driveCount++;
-                        if (c.ps.AgOn) agCount++;
-                        if (c.ps.HvOn) hvCount++;
-                        if (c.ps.TaOn) taCount++;
-                        TotalParticlePower += c.ps.ParticlePower;
-                    }
-                    else if (m is GNDriveTauSystem t && t.ps.EngineState)
-                    {
-                        driveCount++;
-                        if (t.ps.AgOn) agCount++;
-                        if (t.ps.HvOn) hvCount++;
-                        if (t.ps.TaOn) taCount++;
-                        TotalParticlePower += t.ps.ParticlePower;
-                        if (t.ps.ECOn)
-                        {
-                            TotalParticleGenRate += t.ps.ParticleGenRate;
-                            pgdrive++;
-                        }
-                    }
-                    else if (m is GNDriveSystem d && d.ps.EngineState)
-                    {
-                        driveCount++;
-                        if (d.ps.AgOn) agCount++;
-                        if (d.ps.HvOn) hvCount++;
-                        if (d.ps.TaOn) taCount++;
-                        TotalParticlePower += d.ps.ParticlePower;
-                        TotalParticleGenRate += d.ps.ParticleGenRate;
-                        pgdrive++;
-                    }
-                    else if (m is GNThrusterSystem s && s.ps.EngineState)
-                    {
-                        driveCount++;
-                        if (s.ps.AgOn) agCount++;
-                        if (s.ps.HvOn) hvCount++;
-                        if (s.ps.TaOn) taCount++;
-                        TotalParticlePower += s.ps.ParticlePower;
-                    }
-                }
-            }
-
-            // Sync Rate Bonus calculation (for my drive, bonus is ps.SyncRate * ps.ParticleXXXXX, but particleXXXXX is already added above)
-            TotalParticlePower += ps.ParticlePower * (ps.SyncRate - 1);
-            TotalParticleGenRate += ps.ParticleGenRate * (ps.SyncRate - 1);
+            CalculateDriveCounts(ref agCount, ref hvCount, vessel);
 
             // hv > ag, disable ag when hv > 0
             if (hvCount > 0)
@@ -193,12 +175,9 @@ namespace GNTechnology
             if (ps.TaOn)
             {
                 actualG *= 3f; //Increase actualG in TA mode
-                TotalParticlePower += 2f * ps.ParticlePower * ps.SyncRate; // Increase particle power in TA mode, for this drive only, totalparticlepower already includes ps.particlepower, so add 2x here
             }
 
             // Resource drain calculation
-            TotalParticlePower *= TimeWarp.fixedDeltaTime; // compensation for consumption
-            TotalParticleGenRate *= TimeWarp.fixedDeltaTime; // compensation for consumption
             double mass = vessel.GetTotalMass(); // KSP1.12はdouble
             double UnitConsumption = mass * TimeWarp.fixedDeltaTime; ; // unit particle consumption for Accel=1m/s^2 per second
             double particleGenRateDelta = ps.ParticleGenRate * TimeWarp.fixedDeltaTime;// compensation for consumption
@@ -237,29 +216,11 @@ namespace GNTechnology
 
             // GN particle actual consumption
             double actualConsumption = ps.part.RequestResource("GNparticle", consume);
-            if (actualConsumption < consume - epsilon)
-            {
-                ps.Shortage = true;
-                ps.TaOn = false; // TRANS-AM off
-                Debug.Log("GNparticle Shortage: AC=" + actualConsumption);
-                Debug.Log("GNparticle Shortage: Con=" + consume + epsilon);
-                actualLimitFactor = (float)(actualConsumption / consume);
-                limitFactor = actualLimitFactor; // re-adjust limit factor according to actual consumption
-            }
-            else
-            {
-                ps.Shortage = false;
-            }
+            ps.Shortage = ParticleShortageCheck(actualConsumption, consume, epsilon, ref ps, ref limitFactor);
 
             // --- Engine shut-off check ---
-            if (actualConsumption < consume * 0.001f) // not enough particle, 0.1% threshold, for floating point error margin. At this point, GN is empty because actual draw > planned draw * 0.01f
+            if (EngineShutOffCheck(actualConsumption, consume, fraction, ref ps))
             {
-                Debug.Log("GNparticle Empty");
-                ps.EngineState = false; // also turn off engine state,
-                ps.TaOn = false; // TRANS-AM off
-                ps.AgOn = false; // AG off
-                ps.HvOn = false; // hover off
-                ps.GNdepleted = true; // GN depleted
                 return;
             }
 
@@ -295,6 +256,69 @@ namespace GNTechnology
             }
 
             ps.ThrustDir = (brakes ? brakeDir : ThrustDirection);
+        }
+
+        private static void CalculateDriveCounts(ref int myAgCount, ref int myHvCount, Vessel vessel)
+        {
+            foreach (Part p1 in vessel.parts)
+            {
+                foreach (PartModule m in p1.Modules)
+                {
+                    if (m is GNCondenserDriveSystem c && c.ps.EngineState)
+                    {
+                        if (c.ps.AgOn) myAgCount++;
+                        if (c.ps.HvOn) myHvCount++;
+                    }
+                    else if (m is GNDriveTauSystem t && t.ps.EngineState)
+                    {
+                        if (t.ps.AgOn) myAgCount++;
+                        if (t.ps.HvOn) myHvCount++;
+                    }
+                    else if (m is GNDriveSystem d && d.ps.EngineState)
+                    {
+                        if (d.ps.AgOn) myAgCount++;
+                        if (d.ps.HvOn) myHvCount++;
+                    }
+                    else if (m is GNThrusterSystem s && s.ps.EngineState)
+                    {
+                        if (s.ps.AgOn) myAgCount++;
+                        if (s.ps.HvOn) myHvCount++;
+                    }
+                }
+            }
+        }
+
+        private static bool EngineShutOffCheck(double myActualConsumption, double myConsume, double fraction, ref GNPhysicsState ps)
+        {
+
+            if (myActualConsumption < myConsume * fraction)
+            {
+                Debug.Log("GNparticle Empty");
+                ps.EngineState = false; // also turn off engine state,
+                ps.TaOn = false; // TRANS-AM off
+                ps.AgOn = false; // AG off
+                ps.HvOn = false; // hover off
+                ps.GNdepleted = true; // GN depleted
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool ParticleShortageCheck(double myActualConsumption, double myConsume, double fraction, ref GNPhysicsState ps, ref float myLimitFactor)
+        {
+
+            if (myActualConsumption < myConsume - fraction)
+            {
+                ps.TaOn = false; //TRANS-AM off
+                Debug.Log("GNparticle Shortage: AC=" + myActualConsumption);
+                Debug.Log("GNparticle Shortage: Con=" + myConsume + fraction);
+                myLimitFactor = (float)(myActualConsumption / myConsume);
+
+                return true;
+            }
+
+            return false;
         }
 
         static float _hoverLastA = 0f;      // Previous accel rate [m/s^2]（for through rate）

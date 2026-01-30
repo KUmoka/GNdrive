@@ -293,7 +293,6 @@ namespace GNTechnology
             // Common Update, physics related status
             StatusUpdate();
             SyncUpdate();
-            ParticleGenerationUpdate();
 
             // Repose Update
             UpdateRepose();
@@ -399,13 +398,6 @@ namespace GNTechnology
             SynchronizeRate = ps.SyncRate;
         }
 
-        private void ParticleGenerationUpdate()
-        {
-            // Editor, no need for PG
-            if (!HighLogic.LoadedSceneIsFlight || vessel == null) 
-                return;
-        }
-
         private void ParticleGenerationFixedUpdate()
         {
             ps.ECOn = ECOn;
@@ -437,6 +429,10 @@ namespace GNTechnology
 
         private void PhysicsUpdateSupport()
         {
+            // TRANS-AM power down check
+
+
+            // Update physics state
             ps.EngineState = engineOn;
             ps.AgOn = agOn;
             ps.TaOn = taOn;
@@ -1214,7 +1210,7 @@ namespace GNTechnology
         public bool isSecondGen = false;
         [KSPField(guiName = "Safety Functiuon", guiActive = true)]
         public bool isSgOn = false;
-        private bool TaDisabled = true; // for deactivate TRANS-AM for 2nd Gen Drive
+        public bool TaDisabled = false; // for deactivate TRANS-AM for 2nd Gen Drive
 
         public override void OnActive()
         {
@@ -1250,7 +1246,7 @@ namespace GNTechnology
                 {
                     Debug.Log("[GN] GN Drive Move enable detected in flight PAW.");
                     PAWActivate("sgOn");
-                    sgOn = true;   
+                    sgOn = true;
                 }
             }
             else
@@ -1303,28 +1299,10 @@ namespace GNTechnology
             SyOn = true; // force sync
 
             // Power shortage safeguard for 1st gen drive
-            if (ps.Shortage && !isSecondGen)
-            {
-                sgOn = true; // power drop when particle shortage.
-            }
+            sgOn = EngineSafeGuard(sgOn, ps.Shortage, isSecondGen);
 
-            // TRANS-AM enable -> TaDisabled = false, once activate TRANS-AM, TaDisabled will keep TRANS-AM On.
-            if (taOn && !ps.Shortage && !isSecondGen)
-            {
-                TaDisabled = false;
-            }
-
-            // sustain TaOn if TaDisabled is false.TaDisabled of 2nd Gen is always true. 
-            if (!ps.Shortage && !TaDisabled)
-            {
-                taOn = true;
-            }
-
-            // TaDisabled is true when power shortage
-            if (ps.Shortage)
-            {
-                TaDisabled = true;
-            }
+            // TRANS-AM Check
+            taOn = TransAMControl(ref TaDisabled, taOn, isSecondGen, ps.Shortage);
 
             // check sg
             isSgOn = sgOn;
@@ -1338,7 +1316,6 @@ namespace GNTechnology
             if (part.Resources["GNparticle"].amount > 0 || part.Resources["TopologicalDefects"].amount >= 0.5)
             {
                 engineOn = true; // GN Drive is always on.
-                part.force_activate(); // Keep part activated. 
                 ECOn = true; // Particle Generation is always on when there are enough TD.
             }
             else
@@ -1362,6 +1339,46 @@ namespace GNTechnology
             {
                 //vs.ParticleColor = new Color(0f, 1f, 170f / 255f, 1f); // Original GN Drive color
                 vs.ParticleColor = GNColorDecider.ParticleColor(vs);
+            }
+        }
+
+        private bool TransAMControl(ref bool myTaDisabled, bool myTAOn, bool myIsSecondGen, bool myShortage)
+        {
+            // TRANS-AM enable -> TaDisabled = false, once activate TRANS-AM, TaDisabled will keep TRANS-AM On.
+            if (myTAOn && !myShortage && myIsSecondGen)
+            {
+                myTaDisabled = false;
+            }
+
+            // sustain TaOn if TaDisabled is false.TaDisabled of 2nd Gen is always true. 
+            if (!myShortage && !myTaDisabled)
+            {
+                return true;
+            }
+
+            // TaDisabled is true when power shortage
+            if (myShortage)
+            {
+                myTaDisabled = true;
+                return false;
+            }
+            else
+            {
+                // default continue previous state, and reset TaDisabled.
+                myTaDisabled = false;
+                return myTAOn;
+            }
+        }
+
+        private bool EngineSafeGuard(bool myIsSgOn, bool myShortage, bool myIsSecondGen)
+        {
+            if (myShortage && !myIsSecondGen)
+            {
+                return true;
+            }
+            else
+            {
+                return myIsSgOn;
             }
         }
     }
