@@ -387,12 +387,15 @@ namespace GNTechnology
                 return;
             }
 
-            // accel changed by user
+            // state changed by user
             if (!(OnOff == current)) MarkDirty = true;
 
             // Do sync
             OnOff = current;
-            if (MarkDirty) GNSynchronizer.SynchronizeOtherTargetDrive(OnOff, vessel, part.persistentId, ref ps);
+            if (MarkDirty)
+            {
+                GNSynchronizer.SynchronizeOtherTargetDrive(OnOff, vessel, part.persistentId, ref ps);
+            }
             MarkDirty = false;
             SetMaxG(0, MaxAccel * ps.SyncRate);
             SynchronizeRate = ps.SyncRate;
@@ -836,16 +839,25 @@ namespace GNTechnology
 
         private void UpdateRepose()
         {
+            // no change
             if (previousRepose == Repose)
             {
                 return; // no change
             }
+
+            // state changed
+            string msg = "";
+
             if (Repose)
             {
                 PAWDeactivate(ReposeFieldList);
                 ActionDeactivate(ReposeActionList);
                 retractGNSystemState();
                 previousRepose = Repose;
+
+                // Display message
+                msg = "GN System Reposed. Priority passed to GN System.";
+                ScreenMessages.PostScreenMessage(msg, 3f, ScreenMessageStyle.UPPER_CENTER);
             }
             else
             {
@@ -853,7 +865,23 @@ namespace GNTechnology
                 ActionActivate(ReposeActionList);
                 deployGNSystemState();
                 previousRepose = Repose;
+
+                msg = GenerateReposeDisengageMessage();
+                ScreenMessages.PostScreenMessage(msg, 3f, ScreenMessageStyle.UPPER_CENTER);
             }
+        }
+
+        private string GenerateReposeDisengageMessage()
+        {
+            // Display pilot name if exists
+            var crew = vessel.GetVesselCrew();
+            if (crew.Count > 0)
+            {
+                string pilot = crew[0].name;
+                return $"GN System Repose Disengaged by {pilot}. Priority passed to {pilot}.";
+            }
+
+            return "GN System Repose Disengaged by Vessel Control System. Priority passed to Vessel Control System.";
         }
 
         private void retractGNSystemState()
@@ -1226,7 +1254,8 @@ namespace GNTechnology
         public bool isSecondGen = false;
         [KSPField(guiName = "Safety Functiuon", guiActive = true)]
         public bool isSgOn = false;
-        public bool TaDisabled = false; // for deactivate TRANS-AM for 2nd Gen Drive
+        public bool TaDisabled = true; // for deactivate TRANS-AM for 2nd Gen Drive
+        private bool TANotified = false; // to notify
 
         public override void OnActive()
         {
@@ -1318,7 +1347,7 @@ namespace GNTechnology
             sgOn = EngineSafeGuard(sgOn, ps.Shortage, isSecondGen);
 
             // TRANS-AM Check
-            taOn = TransAMControl(ref TaDisabled, taOn, isSecondGen, ps.Shortage);
+            taOn = TransAMControl(ref TaDisabled, taOn, isSecondGen, ps.Shortage, ref TANotified);
 
             // check sg
             isSgOn = sgOn;
@@ -1358,32 +1387,77 @@ namespace GNTechnology
             }
         }
 
-        private bool TransAMControl(ref bool myTaDisabled, bool myTAOn, bool myIsSecondGen, bool myShortage)
+        private bool TransAMControl(ref bool myTaDisabled, bool myTAOn, bool myIsSecondGen, bool myShortage,ref bool notify)
         {
-            // TRANS-AM enable -> TaDisabled = false, once activate TRANS-AM, TaDisabled will keep TRANS-AM On.
-            if (myTAOn && !myShortage && myIsSecondGen)
+            // 1st Gen Drive
+            if (!myIsSecondGen)
             {
-                myTaDisabled = false;
+                // notified
+                if (myTAOn && !notify)
+                {
+                    ScreenMessages.PostScreenMessage("TRANS-AM System Engaged", 3f, ScreenMessageStyle.UPPER_CENTER);
+                    notify = true;
+                }
+
+                // TRANS-AM enable -> TaDisabled = false, once activate TRANS-AM, TaDisabled will keep TRANS-AM On.
+                if (myTAOn && !myShortage)
+                {
+                    myTaDisabled = false;
+                }
+
+                // sustain TaOn if TaDisabled is false.TaDisabled of 2nd Gen is always true. 
+                if (!myShortage && !myTaDisabled)
+                {
+                    return true;
+                }
+
+                // TA off when particle is not enough.
+                else if (myShortage && !myTaDisabled)
+                {
+                    myTaDisabled = true;
+                    ScreenMessages.PostScreenMessage("TRANS-AM System Disengaged due to the lack of GN particles", 3f, ScreenMessageStyle.UPPER_CENTER);
+                    notify = false;
+                    return false;
+                }
+
+                // keep previous state, when TA off
+                else
+                {
+                    return myTAOn;
+                }
             }
 
-            // sustain TaOn if TaDisabled is false.TaDisabled of 2nd Gen is always true. 
-            if (!myShortage && !myTaDisabled)
-            {
-                return true;
-            }
-
-            // TaDisabled is true when power shortage
-            if (myShortage)
-            {
-                myTaDisabled = true;
-                return false;
-            }
+            // 2nd Gen Drive, Tested OK
             else
             {
-                // default continue previous state, and reset TaDisabled.
-                myTaDisabled = false;
-                return myTAOn;
+                if (myTAOn && !notify)
+                {
+                    ScreenMessages.PostScreenMessage("TRANS-AM System Engaged", 3f, ScreenMessageStyle.UPPER_CENTER);
+                    notify = true;
+                    return true;
+                }
+
+                if (myShortage && notify)
+                {
+                    ScreenMessages.PostScreenMessage("TRANS-AM System Disengaged due to the lack of GN particles", 3f, ScreenMessageStyle.UPPER_CENTER);
+                    notify = false;
+                    return false;
+                }
+
+                else if (!taOn && notify)
+                {
+                    ScreenMessages.PostScreenMessage("TRANS-AM System Disengaged", 3f, ScreenMessageStyle.UPPER_CENTER);
+                    notify = false;
+                    return false;
+                }
+
+                else
+                {
+                    // default continue previous state, and reset TaDisabled.
+                    return myTAOn;
+                }
             }
+ 
         }
 
         private bool EngineSafeGuard(bool myIsSgOn, bool myShortage, bool myIsSecondGen)

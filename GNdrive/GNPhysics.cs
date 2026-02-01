@@ -163,6 +163,9 @@ namespace GNTechnology
             //if (speed == 1) BrakeMag = 0.05f;// speed == 1 is clamp active case.
             Vector3 brakeDir = -vSrf / speed; // unit vector until speed < 1
 
+            // Trans-am mode multiplier
+            float taMult = ps.TaOn ? 3f : 1f;
+
             CalculateDriveCounts(ref agCount, ref hvCount, vessel);
 
             // hv > ag, disable ag when hv > 0
@@ -210,8 +213,8 @@ namespace GNTechnology
             // case sagfeguard on
             if (ps.SafeGuard && consumption > 0)
             {
-                consume = (double)Mathf.Clamp((float)consumption, 0f, (float)particleGenRateDelta);
-                limitFactor = Mathf.Min((float)particleGenRateDelta / (float)consumption, 1f); // usually, drive exert all the power. so it will be = ps.particleGenRate/ps.particlePower.
+                consume = (double)Mathf.Clamp((float)consumption, 0f, (float)particleGenRateDelta * taMult);
+                limitFactor = Mathf.Min((float)particleGenRateDelta * taMult / (float)consumption, 1f); // usually, drive exert all the power. so it will be = ps.particleGenRate/ps.particlePower.
             }
 
             // GN particle actual consumption
@@ -359,6 +362,7 @@ namespace GNTechnology
         // Edge case problemhere. later fix!
 
         private static double difficulty = 0.1f;
+        private static double fraction = 5e-3; // 0.5% threshold
 
         public static void ParticleSupply(ref GNPhysicsState ps, double dt)
         {
@@ -370,6 +374,8 @@ namespace GNTechnology
             double ECReqGen = 0f;
             double ErrorMargin = 0.01f;
             var TD = ps.part.Resources["TopologicalDefects"];
+            //var GNP = ps.part.Resources["GNparticle"];
+            var EC = ps.part.Resources["ElectricCharge"];
             double lack = (TD.maxAmount - 2 * TD.amount);   // TD shortage
             double GenRateDt = ps.ParticleGenRate * dt;
             bool isNotEnoughPower = false;
@@ -382,7 +388,7 @@ namespace GNTechnology
             // EC drain
             double Pulled = ps.part.RequestResource("ElectricCharge", ECReqGen); // EC pulled here, if not enough EC, Pulled < ECReqGen
 
-            // EC empty, 1f threshold
+            // EC empty, 1f threshold. not sure if this is needed.
             if (Pulled <= 1f * dt && ECReqGen > 0)
             {
                 FurnaceCutOff(ref ps);
@@ -394,6 +400,12 @@ namespace GNTechnology
             {
                 GNGen *= (Pulled / ECReqGen); // scale down GN generation
                 isNotEnoughPower = true;
+            }
+
+            // EC deplition check, 0.5% threshold
+            if (ECDepletionCheck(EC.amount, EC.maxAmount, fraction, ECReqGen, ref ps))
+            {
+                return;
             }
 
             // GN Generation. particle added here. if not enough space, (Abs) actualAdd < GNGen
@@ -428,6 +440,24 @@ namespace GNTechnology
             //Debug.Log("EC depleted during GN particle generation.");
             ps.ECOn = false;
             ps.ECdepleted = true;
+        }
+
+        private static bool ECDepletionCheck(double myECAmount, double myECMax, double myFraction, double myECRecGen, ref GNPhysicsState ps)
+        {
+            // try pull 1 EC to check amount
+            double pulledFraction = ps.part.RequestResource("ElectricCharge", 1d); 
+
+            // if EC = 0.0 then satify this condition.
+            if (myECAmount <= myECMax * myFraction && myECRecGen > 0 && pulledFraction < myFraction) 
+            {
+                FurnaceCutOff(ref ps);
+                return true;
+            }
+
+            // Check complete, return 1 EC.
+            pulledFraction = ps.part.RequestResource("ElectricCharge", -1d); 
+
+            return false;
         }
     }
 }

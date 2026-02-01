@@ -284,11 +284,8 @@ namespace GNTechnology
                     m.accel = OnOffLst.MaxG;
                     m.sgOn = OnOffLst.LSgOn;
 
-                    // TA for 1st Gen
-                    if (!m.TaDisabled)
-                    {
-                        m.taOn = OnOffLst.LtaOn;
-                    }
+                    // TA for 1st/2nd Gen
+                    m.taOn = OnOffLst.LtaOn;
 
                     // List.add
                     deviation.Add(m.DriveIndividuality);
