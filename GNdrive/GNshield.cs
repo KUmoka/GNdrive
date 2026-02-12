@@ -824,6 +824,18 @@ namespace GNTechnology
         private AeroBackup myAero;
         float cdEff = 0.00005f; // 仮のCd効率
 
+        // ===== Repulsion params (tuning) =====
+        [KSPField(isPersistant = false)]
+        public float repelK = 50f;      // バネ強度（大きいほど硬い）
+        [KSPField(isPersistant = false)]
+        public float repelD = 10f;      // 減衰（大きいほど粘る）
+        [KSPField(isPersistant = false)]
+        public float maxRepelAccel = 30f; // 1秒あたり加速度上限 (m/s^2) 相当の目安
+
+        // 相手vesselの大きさを雑に見積もる係数（後で改善可）
+        [KSPField(isPersistant = false)]
+        public float otherRadiusFallback = 2f;
+
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
@@ -863,14 +875,20 @@ namespace GNTechnology
         {
             base.OnFixedUpdate();
             if (!HighLogic.LoadedSceneIsFlight || vessel == null)
+            {
                 return;
-
-            if (isActive)
-                {
-                // GN Field Drag Application
-                
-                ApplyGNFieldDrag(part.vessel, fieldRadius, cdEff);
             }
+
+            if (!isActive)
+            {
+                return;
+            }
+
+            // GN Field Drag Application
+            ApplyGNFieldDrag(part.vessel, fieldRadius, cdEff);
+
+            // Repulsion Force Application
+            ApplyGNFieldRepulsion(vessel, fieldRadius);
         }
 
         private void UpdateShielding()
@@ -1028,6 +1046,73 @@ namespace GNTechnology
             Vector3 pos = v.CoM;
 
             rb.AddForceAtPosition(force, pos, ForceMode.Force);
+        }
+
+        private void ApplyGNFieldRepulsion(Vessel self, float r)
+        {
+            if (self == null || self.rootPart == null) return;
+
+            // self rb
+            var selfRb = self.rootPart.rb;
+            if (selfRb == null) return; // packed等
+
+            Vector3 selfCoM = (Vector3)self.CoM;
+
+            // 物理的にロードされてる船だけ対象
+            // KSPは近傍のVesselが FlightGlobals.VesselsLoaded に入る
+            var loaded = FlightGlobals.VesselsLoaded;
+            if (loaded == null) return;
+
+            float rSelf = r;
+
+            foreach (var other in loaded)
+            {
+                if (other == null) continue;
+                if (other == self) continue;
+                if (!other.loaded) continue;
+                if (other.packed) continue; // rbが無い/安定しない
+
+                if (other.rootPart == null || other.rootPart.rb == null) continue;
+
+                Vector3 otherCoM = (Vector3)other.CoM;
+
+                Vector3 delta = otherCoM - selfCoM;
+                float dist = delta.magnitude;
+                if (dist < 1e-3f) continue;
+
+                // 相手半径を雑に見積もる（あとで「相手vesselの最大半径」をキャッシュして精度UP可）
+                float rOther = otherRadiusFallback;
+
+                float limit = rSelf + rOther;            // “接触”とみなす距離
+                float penetration = limit - dist;        // めり込み量
+                if (penetration <= 0f) continue;
+
+                Vector3 n = delta / dist;                // self→other の法線
+
+                // 相対速度（ワールド）
+                Vector3 relVel = (Vector3)(other.obt_velocity - self.obt_velocity);
+
+                // 接近成分（負なら近づいてる）
+                float vN = Vector3.Dot(relVel, n);
+
+                // バネ（めり込み） + ダンパ（接近速度）
+                float forceMag = repelK * penetration - repelD * vN;
+
+                // 反発なので最低0（離れてるのに吸い込まない）
+                if (forceMag < 0f) forceMag = 0f;
+
+                // 上限（加速上限で雑クリップ）
+                float maxForce = maxRepelAccel * other.rootPart.rb.mass;
+                if (forceMag > maxForce) forceMag = maxForce;
+
+                Vector3 force = n * forceMag;
+
+                // 相手を押す（まずは相手だけに作用で安定寄り）
+                other.rootPart.rb.AddForceAtPosition(force, otherCoM, ForceMode.Force);
+
+                // 反作用も入れたいなら（暴れたらOFF推奨）
+                // selfRb.AddForceAtPosition(-force, selfCoM, ForceMode.Force);
+            }
         }
     }
 }

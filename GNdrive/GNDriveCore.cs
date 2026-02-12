@@ -278,6 +278,10 @@ namespace GNTechnology
             Debug.Log("[GN] SystemInit Completed.");
             Debug.Log($"[GN] Base Engine online = {engineOn}");
             Debug.Log($"[GN] OnStart state={state} engineOn={engineOn}");
+
+            // parts variant update
+            CheckVariantParameters();
+            Debug.Log($"[GN] Variant parameters checked in Editor. RA = {RotationAngle}");
         }
 
         public override void OnUpdate()
@@ -933,6 +937,49 @@ namespace GNTechnology
             SyOn = false;
             PreLaunched = true;
         }
+
+        private void CheckVariantParameters()
+        {
+            // Variant specific setup
+            var mpv = part.FindModuleImplementing<ModulePartVariants>();
+            var vName = mpv?.SelectedVariant?.Name;
+            var vNode = FindVariantNodeByName(part, vName);
+            Debug.Log($"[GN] Variant specific setup for variant '{vName}'");
+            float VariantRotationAngle = GetVariantFloat(vNode, "RotationAngle", 0f);
+            Debug.Log($"[GN] Variant RotationAngle = {VariantRotationAngle}");
+            if (!(VariantRotationAngle == 0))
+            {
+                RotationAngle = VariantRotationAngle;
+                vs.RotAngleX = RotationAngle;
+            }
+        }
+
+        private ConfigNode FindVariantNodeByName(Part part, string variantName)
+        {
+            var cfg = part?.partInfo?.partConfig;
+            if (cfg == null) return null;
+
+            foreach (var mpvNode in cfg.GetNodes("MODULE"))
+            {
+                if (mpvNode.GetValue("name") != "ModulePartVariants") continue;
+
+                foreach (var vNode in mpvNode.GetNodes("VARIANT"))
+                {
+                    if (vNode.GetValue("name") == variantName)
+                        return vNode;
+                }
+            }
+            return null;
+        }
+
+        private float GetVariantFloat(ConfigNode vNode, string key, float defVal)
+        {
+            if (vNode == null) return defVal;
+            var s = vNode.GetValue(key);
+            if (string.IsNullOrEmpty(s)) return defVal;
+            return float.TryParse(s, out var f) ? f : defVal;
+        }
+
     }
 
     public class GNThrusterSystem : GNBaseSystem // GN thrusters
