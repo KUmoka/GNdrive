@@ -101,8 +101,8 @@ namespace GNTechnology
         }
 
         // FP error avoidance
-        private static double epsilon = 1e-2;
-        private static double fraction = 1e-3;
+        private static double epsilon = 1e-1;
+        private static double fraction = 1e-2;
 
         public static void SetOff(in GNPhysicsState ps)
         {
@@ -359,7 +359,7 @@ namespace GNTechnology
 
     public static class GNGenerationFurnace
     {
-        // Edge case problemhere. later fix!
+        // Edge case problemhere. later fix! -> TRANS-AM mode now won't generaste particles for prevents infinite trans-am mode.
 
         private static double difficulty = 0.1f;
         private static double fraction = 5e-3; // 0.5% threshold
@@ -379,6 +379,7 @@ namespace GNTechnology
             double lack = (TD.maxAmount - 2 * TD.amount);   // TD shortage
             double GenRateDt = ps.ParticleGenRate * dt;
             bool isNotEnoughPower = false;
+            bool isTaOn = ps.TaOn;
 
             // GN and Tau
             ECReqGen = GenRateDt * lack * difficulty; // EC required proportional to lack of TD
@@ -409,6 +410,12 @@ namespace GNTechnology
             }
 
             // GN Generation. particle added here. if not enough space, (Abs) actualAdd < GNGen
+            // only if TRANS-AM off.
+            if (isTaOn)
+            {
+                return;
+            }
+
             double Aadd = Math.Abs(ps.part.RequestResource("GNparticle", (double)(-1 * GNGen)));
             ps.UsedGNParticle = GNGen; // store used GN particle
             ps.ECdepleted = false; // can draw EC = not empty
