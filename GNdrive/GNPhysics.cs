@@ -52,6 +52,7 @@ namespace GNTechnology
             ParticlePower = 0f,
             ParticleGenRate = 0f,
             MaxG = 0f,
+            RCSFactor = 0f,
             UsedGNParticle = 0f,
 
             // Twin drive defaults
@@ -133,7 +134,7 @@ namespace GNTechnology
             // Normalize input vector
             float norm = Mathf.Sqrt(x * x + y * y + z * z);
             float w = 0f;
-            if (norm >= 1e-6f)
+            if (norm >= fraction)
             {
                 w = (1f - throttle) / norm;
                 w = Mathf.Clamp01(w);
@@ -143,7 +144,7 @@ namespace GNTechnology
             var up = vessel.ReferenceTransform.up;
             var fwd = vessel.ReferenceTransform.forward;
             var rgt = vessel.ReferenceTransform.right;
-            Vector3 ThrustDirection = ps.RCSFactor * (up * z * w + fwd * y * w + rgt * x * w) + up * throttle;//throttle will be remapped later.
+            Vector3 ThrustDirection = (up * z * w + fwd * y * w + rgt * x * w) + up * throttle; //user can adjust this balance with RCS factor. Pushing forward (positive y) will produce forward thrust.
             Vector3 gee = FlightGlobals.getGeeForceAtPosition(vessel.transform.position); // m/s^2
 
             // Hover acceleration calculation
@@ -205,7 +206,7 @@ namespace GNTechnology
 
             // Ag, Hv > Brake > thrust, priority order.
             double consumption = Math.Min((double)support * UnitConsumption, particlePowerDelta) ; // first, consume for hover and anti-gravity.if not enough power, consume all power for them.
-            consumption += NeededThrustBudget * ThrustDirection.magnitude * UnitConsumption;  // then, consume for thrust or brakes....most of the time, consumption will be = to ps.ParticlePower. Also, throttle is applied here.           
+            consumption += (brakes ? ThrustBudget * BrakeMag * Mathf.Clamp01(vSrf.magnitude ) * UnitConsumption : NeededThrustBudget * ThrustDirection.magnitude * UnitConsumption);  // then, consume for thrust or brakes.           
 
             // Particle Consumption calculation with SafeGuard and generation consideration
             double consume = consumption; // Basic assumption
