@@ -206,7 +206,7 @@ namespace GNTechnology
 
             // Ag, Hv > Brake > thrust, priority order.
             double consumption = Math.Min((double)support * UnitConsumption, particlePowerDelta) ; // first, consume for hover and anti-gravity.if not enough power, consume all power for them.
-            consumption += (brakes ? ThrustBudget * BrakeMag * Mathf.Clamp01(vSrf.magnitude ) * UnitConsumption : NeededThrustBudget * ThrustDirection.magnitude * UnitConsumption);  // then, consume for thrust or brakes.           
+            consumption += (brakes ? NeededThrustBudget * BrakeMag * Mathf.Clamp01(vSrf.magnitude ) * UnitConsumption : NeededThrustBudget * ThrustDirection.magnitude * UnitConsumption);  // then, consume for thrust or brakes.           
 
             // Particle Consumption calculation with SafeGuard and generation consideration
             double consume = consumption; // Basic assumption
