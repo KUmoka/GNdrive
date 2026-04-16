@@ -900,7 +900,8 @@ namespace GNTechnology
             if (!isActive) return;
 
             float r2 = fieldRadius * fieldRadius;
-            Vector3 center = part.transform.position;
+            // Vector3 center = part.transform.position; Not CoM based, to avoid shielded parts being outside of field when CoM is far from part.
+            Vector3 center = vessel.CoM; // ShieldedFromAirstream はパーツ単位のフラグなので、CoM基準でシールドする。
 
             foreach (var p in vessel.parts)
             {
