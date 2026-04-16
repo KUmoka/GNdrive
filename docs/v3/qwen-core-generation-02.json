@@ -1,0 +1,33 @@
+{
+  "id": "chatcmpl-8b6k9brkvanw6y92siek3n",
+  "object": "chat.completion",
+  "created": 1790088134,
+  "model": "qwen/qwen3.8-27b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "```csharp\npublic static double Coefficient(IList<double> values)\n{\n    if (values == null) throw new ArgumentNullException(nameof(values));\n    int n = values.Count;\n    if (n <= 1) return 1.0;\n\n    var sorted = values.ToArray();\n    foreach (double v in sorted)\n        if (!double.IsFinite(v) || v < 0.0 || v > 1.0)\n            throw new ArgumentOutOfRangeException(nameof(values));\n\n    Array.Sort(sorted);\n\n    double sum = 0.0;\n    foreach (double v in sorted) sum += v;\n    double mean = sum / n;\n\n    double sumSq = 0.0;\n    foreach (double v in sorted) sumSq += (v - mean) * (v - mean);\n    double sampleVariance = sumSq / (n - 1);\n\n    double clamped = Math.Min(1.0, Math.Max(0.0, 4.0 * sampleVariance));\n    return n * Math.Pow(1.0 - clamped, n);\n}\n```",
+        "reasoning_content": "The user wants a C# 7.3 function that:\n1. Takes `IList<double> values`\n2. If n <= 1, return 1\n3. Otherwise compute `n * Pow(1 - Clamp(4 * sampleVariance, 0, 1), n)`\n4. Sort a copy of values for deterministic summation\n5. Validate inputs (finite, in [0,1])\n6. Return concise code\n\nSample variance = sum((x - mean)^2) / (n-1)\n\nLet me write this:\n\n```csharp\npublic static double Coefficient(IList<double> values)\n{\n    if (values == null) throw new ArgumentNullException(nameof(values));\n    int n = values.Count;\n    if (n <= 1) return 1.0;\n\n    var sorted = values.ToArray();\n    foreach (double v in sorted)\n    {\n        if (!double.IsFinite(v) || v < 0.0 || v > 1.0)\n            throw new ArgumentOutOfRangeException(nameof(values));\n    }\n\n    Array.Sort(sorted);\n\n    double sum = 0.0;\n    foreach (double v in sorted) sum += v;\n    double mean = sum / n;\n\n    double sumSq = 0.0;\n    foreach (double v in sorted) sumSq += (v - mean) * (v - mean);\n    double sampleVariance = sumSq / (n - 1);\n\n    double clamped = Math.Min(1.0, Math.Max(0.0, 4.0 * sampleVariance));\n    return n * Math.Pow(1.0 - clamped, n);\n}\n```\n\nThis is clean and concise. Let me verify:\n- Validates null, finite, [0,1]\n- n <= 1 returns 1\n- Sorts copy for deterministic summation\n- Computes sample variance (n-1 denominator)\n- Clamps 4*variance to [0,1]\n- Returns n * (1 - clamped)^n\n\nLooks good.\n",
+        "tool_calls": []
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 140,
+    "completion_tokens": 696,
+    "total_tokens": 836,
+    "completion_tokens_details": {
+      "reasoning_tokens": 452
+    }
+  },
+  "stats": {
+    "total_draft_tokens_count": 579,
+    "accepted_draft_tokens_count": 503,
+    "rejected_draft_tokens_count": 76
+  },
+  "system_fingerprint": "qwen/qwen3.8-27b"
+}

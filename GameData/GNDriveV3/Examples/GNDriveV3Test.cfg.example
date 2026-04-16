@@ -1,0 +1,109 @@
+// Rename to .cfg in a test KSP install only. Requires GNparticle and TopologicalDefects definitions.
+// Uses the installed stock girder model. No V2 physics modules, no ModuleManager dependency.
+PART
+{
+    name = GNDriveV3Test
+    module = Part
+    author = KUmoka
+    MODEL
+    {
+        model = Squad/Parts/Structural/trussGirderL/model
+    }
+    rescaleFactor = 1
+    node_stack_bottom = 0, -0.5592728, 0, 0, -1, 0, 1
+    node_stack_top = 0, 0.5592728, 0, 0, 1, 0, 1
+    node_attach = 0, -0.5592728, 0, 0, -1, 0
+    attachRules = 1,1,1,1,0
+    TechRequired = start
+    entryCost = 0
+    cost = 1000
+    category = Engine
+    subcategory = 0
+    title = GN Drive V3 Test (alpha)
+    manufacturer = GN Technology
+    description = V3 simulation test fixture. Placeholder ratings and stock model. Set acceleration after enabling propulsion.
+    mass = 0.125
+    dragModelType = default
+    maximum_drag = 0.2
+    minimum_drag = 0.2
+    angularDrag = 1
+    crashTolerance = 80
+    breakingForce = 200
+    breakingTorque = 200
+    maxTemp = 2000
+    bulkheadProfiles = size0, srf
+    MODULE
+    {
+        name = GNModule
+        HasPropulsion = true
+        HasGeneration = true
+        HasTD = true
+        HasTransAM = true
+        HasMultiDrive = true
+        HasField = true
+        Gen1 = false
+        Power = 100
+        MaxGContribution = 5
+        ParticleGenerationRate = 100
+        ECPerParticle = 1
+        ECPerTDSecond = 2
+        TransAMRatio = 3
+        MaxTorqueNm = 10000
+        ParticlePerNmSecond = 0.0001
+        FieldReferenceDiameter = 10
+        FieldParticleRate = 1
+        Individuality = 0.5
+        InitialInternalEC = 1
+        InitialInternalParticles = 1
+        // Optional model-specific visual transform names and sound path:
+        RotorTransform = rotor
+        DeployTransform =
+        EmissiveTransform =
+        AudioPath =
+        ParticleAcceleration = 20
+        GN_PROFILE
+        {
+            variant = Boost
+            Power = 150
+            ParticleGenerationRate = 150
+            ECPerTDSecond = 3
+        }
+    }
+    MODULE
+    {
+        name = ModulePartVariants
+        baseVariant = Standard
+        VARIANT
+        {
+            name = Standard
+            displayName = Standard
+            primaryColor = #00ff99
+            secondaryColor = #333333
+        }
+        VARIANT
+        {
+            name = Boost
+            displayName = Boost (test)
+            primaryColor = #ff3399
+            secondaryColor = #333333
+        }
+    }
+    RESOURCE
+    {
+        name = GNparticle
+        amount = 1000
+        maxAmount = 1000
+    }
+    RESOURCE
+    {
+        name = ElectricCharge
+        amount = 1000
+        maxAmount = 1000
+    }
+    RESOURCE
+    {
+        name = TopologicalDefects
+        amount = 50
+        maxAmount = 100
+    }
+}

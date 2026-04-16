@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>入り抜き生成</name>
+  <id>kumoka.irinuki.generate</id>
+  <param name="input_mode" type="optiongroup" appearance="combo" gui-text="A/Bの判定方法">
+    <option value="selection">選択順: 先=A, 後=B</option>
+    <option value="stack">重なり順: 下=A, 上=B</option>
+  </param>
+  <param name="output_mode" type="optiongroup" appearance="combo" gui-text="出力方法">
+    <option value="replace">元Bを置換</option>
+    <option value="keep">新規Bを作成して元Bを残す</option>
+    <option value="hide">新規Bを作成して元Bを非表示</option>
+  </param>
+  <param name="preserve_effects" type="bool" gui-text="Bのスタイルとパスエフェクトを引き継ぐ">true</param>
+  <param name="error_when_too_long" type="bool" gui-text="Bが対象区間より長い場合はエラーにする">true</param>
+  <param name="samples" type="int" min="20" max="1000" gui-text="弧長計算のサンプル数">200</param>
+  <effect needs-live-preview="false">
+    <object-type>path</object-type>
+    <effects-menu>
+      <submenu name="KUmoka"/>
+    </effects-menu>
+  </effect>
+  <script>
+    <command location="inx" interpreter="python">irinuki_generate.py</command>
+  </script>
+</inkscape-extension>

@@ -1,0 +1,29 @@
+{
+  "id": "chatcmpl-tzbbhrj8lqbk8x6imdiln",
+  "object": "chat.completion",
+  "created": 1790131591,
+  "model": "meta/muse-glimmer",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "**Review**\n\nV2 is correct in scope: only legacy `KSPParticleEmitter` with EMI in name, and it only touches `localVelocity`. V3 is too broad: starting every `ParticleSystem` and `KSPParticleEmitter` in a part will break stock effects, decouplers, engines, etc. It also never initializes velocity/emission/size, which explains sparse giant sideways particles.\n\nYour proposed fix is better scoped but still risky.\n\n**Concrete risks**\n\n1. **Name filter fragility**: `Contains(\"EMI\")` will match unintended emitters and miss renamed mods. Case sensitivity and localization can break it.\n2. **Backing ParticleSystem coupling**: Legacy `KSPParticleEmitter` drives a hidden `ParticleSystem`. Setting legacy fields without syncing the backing system can cause desync, double emission, or Unity warnings.\n3. **Hardcoded values**: 500-800 p/s, size 0.025-0.06, lifetime 0.5-1.2s will be wrong for different parts/scale. No per-emitter override.\n4. **WorldVelocity zero**: Setting worldVelocity to zero overrides any intentional wind/transform motion. Should be additive, not absolute.\n5. **Start/stop side effects**: Blindly starting emitters on part load can cause emission before the part is in world, wasting particles.\n6. **Preservation**: `randomVelocity` and textures are preserved, but `emission` and `size` are overwritten every frame if not cached.\n\n**Minimal corrected approach**\n\nScope to legacy emitters only, run once on init, use configurable defaults.\n\n```csharp\nvoid InitEmitters(Part part, EmitterConfig cfg)\n{\n    foreach (var e in part.FindModelComponents<KSPParticleEmitter>())\n    {\n        if (!e.name.Contains(\"EMI\")) continue;\n        var ps = e.particleSystem; // backing system\n        if (ps == null) continue;\n\n        // Do not start ParticleSystem directly\n        e.emit = false; // let KSP control start/stop\n\n        // Legacy fields only\n        e.localVelocity = new Vector3(0f, -cfg.speed, 0f);\n        e.worldVelocity = Vector3.zero;\n        e.minSize = cfg.minSize;\n        e.maxSize = cfg.maxSize;\n        e.minEmission = cfg.minEmit;\n        e.maxEmission = cfg.maxEmit;\n        e.minLifetime = cfg.minLife;\n        e.maxLifetime = cfg.maxLife;\n\n        // Preserve existing\n        // e.randomVelocity, e.texture, e.position untouched\n    }\n}\n```\n\nRun once in `OnStart`/`OnPartReady`, not every Update. Make `EmitterConfig` configurable via ModuleConfig. Avoid touching `ParticleSystem` components directly.",
+        "reasoning_content": "Review a narrowly scoped KSP Unity particle fix... Identify concrete risks and suggest minimal corrected C# approach in <=350 words. Do not use tools.\n\nWe need comply with request. Provide review, risks, minimal corrected C# approach. <=350 words.\n\nProbably okay.",
+        "tool_calls": []
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 219,
+    "completion_tokens": 634,
+    "total_tokens": 853,
+    "completion_tokens_details": {
+      "reasoning_tokens": 55
+    }
+  },
+  "stats": {},
+  "system_fingerprint": "meta/muse-glimmer"
+}

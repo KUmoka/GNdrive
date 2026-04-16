@@ -1,0 +1,29 @@
+{
+  "id": "chatcmpl-q3up7a5j128lyi4x8ebc4",
+  "object": "chat.completion",
+  "created": 1790219370,
+  "model": "meta/muse-glimmer",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "```csharp\nusing System;\nusing System.Globalization;\n\npublic struct Vec\n{\n    public double R, G, B;\n    public Vec(double r, double g, double b) { R = r; G = g; B = b; }\n}\n\npublic static class VecParser\n{\n    public static Vec ParseRgb(string raw)\n    {\n        if (raw == null) throw new FormatException();\n        var parts = raw.Split(',');\n        if (parts.Length != 3) throw new FormatException();\n        double[] v = new double[3];\n        for (int i = 0; i < 3; i++)\n        {\n            string s = parts[i].Trim();\n            if (!double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out double d))\n                throw new FormatException();\n            if (double.IsNaN(d) || double.IsInfinity(d)) throw new FormatException();\n            if (d < 0.0 || d > 1.0) throw new FormatException();\n            v[i] = d;\n        }\n        return new Vec(v[0], v[1], v[2]);\n    }\n}\n```",
+        "reasoning_content": "Write C# static Vec ParseRgb(string raw) using System only: comma separated exactly3 components RGB 0..1, double.TryParse NumberStyles.Float CultureInfo.InvariantCulture. Reject NaN Infinity out-of-range missing components using FormatException. Vec ctor(double,double,double). Code only no tools.\n\nNeed output code only. Provide static method.\n\nProbably class Vec with ctor.\n\nImplement ParseRgb.\n\nUse System, System.Globalization.\n\nReturn Vec.\n\nThrow FormatException.\n\nCode only.\n\nLet's output.",
+        "tool_calls": []
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 116,
+    "completion_tokens": 345,
+    "total_tokens": 461,
+    "completion_tokens_details": {
+      "reasoning_tokens": 98
+    }
+  },
+  "stats": {},
+  "system_fingerprint": "meta/muse-glimmer"
+}

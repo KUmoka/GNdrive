@@ -1,0 +1,29 @@
+{
+  "id": "chatcmpl-axueg8vtq3ktcjnk5gcg9",
+  "object": "chat.completion",
+  "created": 1790178206,
+  "model": "meta/muse-glimmer",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "public static double SafeRate(double rate, double lifetime, int capacity)\n{\n    double r = System.Math.Max(0.0, rate);\n    double lt = System.Math.Max(0.05, lifetime);\n    double cap = System.Math.Max(0.0, capacity);\n    double maxRate = cap * 0.8 / lt;\n    return System.Math.Min(r, maxRate);\n}\n",
+        "reasoning_content": "Return only pure C# static double SafeRate(double rate,double lifetime,int capacity). Clamp rate>=0, lifetime>=0.05, capacity>=0; return min(rate,capacity*0.8/lifetime). System.Math only. Used to keep continuous Unity emission below live-particle limit. No tools.\n\nWe need return only pure C# static double SafeRate... Probably just code.\n\nNo tools. Provide code snippet.\n\nEnsure pure C# static double SafeRate...\n\nProbably within a class? Just method? Probably static method.\n\nReturn only pure C# static double... Likely provide method definition.\n\nOutput code only.\n\nLet's produce:\n\npublic static double SafeRate(double rate, double lifetime, int capacity){...}\n\nUse System.Math.Max/Min.\n\nClamp rate>=0 => Math.Max(0, rate)\nlifetime>=0.05 => Math.Max(0.05, lifetime)\ncapacity>=0 => Math.Max(0, capacity)\n\nreturn Math.Min(clampedRate, clampedCapacity*0.8 / clampedLifetime)\n\nProvide only code.\n\nNo extra text.\n\n",
+        "tool_calls": []
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 118,
+    "completion_tokens": 306,
+    "total_tokens": 424,
+    "completion_tokens_details": {
+      "reasoning_tokens": 214
+    }
+  },
+  "stats": {},
+  "system_fingerprint": "meta/muse-glimmer"
+}

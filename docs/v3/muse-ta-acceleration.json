@@ -1,0 +1,29 @@
+{
+  "id": "chatcmpl-rvsvmwzzbqrtvl7rh051h",
+  "object": "chat.completion",
+  "created": 1790163468,
+  "model": "meta/muse-glimmer",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "```csharp\npublic static class GNTransAMUnit\n{\n    public static double AccelerationMultiplier(IEnumerable<DriveState> drives)\n    {\n        return drives.Any(d => d.Running && d.TA && d.Definition.TransAM) ? 3.0 : 1.0;\n    }\n}\n```\nInactive TA drives are ignored because the multiplier requires `Running && TA && Definition.TransAM` to be true.",
+        "reasoning_content": "Return only C# static double AccelerationMultiplier(IEnumerable<DriveState> drives) for GNTransAMUnit. Exactly3 if any d.Running && d.TA && d.Definition.TransAM, otherwise1. LINQ available. No mutation. Fixed3 independent TransAMRatio. Then one sentence covering inactive TA.\n\nReturn only C# static double... Then one sentence covering inactive TA.\n\nWe need output code then one sentence.\n\nProbably provide method.\n\nEnsure no mutation.\n\nReturn code snippet.\n\nProbably:\n\npublic static double AccelerationMultiplier(IEnumerable<DriveState> drives) => drives.Any(d => d.Running && d.TA && d.Definition.TransAM) ? 3.0 : 1.0;\n\nThen sentence: Inactive TA drives do not contribute to the multiplier.\n\nProvide exactly? Probably output code and sentence.\n\nLet's comply.",
+        "tool_calls": []
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 119,
+    "completion_tokens": 261,
+    "total_tokens": 380,
+    "completion_tokens_details": {
+      "reasoning_tokens": 165
+    }
+  },
+  "stats": {},
+  "system_fingerprint": "meta/muse-glimmer"
+}

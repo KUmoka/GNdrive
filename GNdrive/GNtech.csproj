@@ -72,14 +72,13 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="GNDriveCore.cs" />
-    <Compile Include="GNMechanics.cs" />
-    <Compile Include="GNPhysics.cs" />
-    <Compile Include="GNshield.cs" />
     <Compile Include="GNsword.cs" />
-    <Compile Include="GNVessels.cs" />
+<<<<<<< Updated upstream
     <Compile Include="GNVisuals.cs" />
     <Compile Include="PID.cs" />
+=======
+    <Compile Include="GNSystems.cs" />
+>>>>>>> Stashed changes
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -89,10 +88,13 @@
   <PropertyGroup>
     <PostBuildEvent>set "KSP=C:\Game\Kerbal Space Program"
 set "MOD=GNdrive"
-set "DEST=%25KSP%25\GameData\%25MOD%25\Plugins"
+set "ROOT=%25KSP%25\GameData\%25MOD%25"
+set "DEST=%25ROOT%25\Plugins"
+set "SETTINGS=$(ProjectDir)..\GameData\GNDriveV3\GNSettings.cfg"
 
 if not exist "%25DEST%25" mkdir "%25DEST%25"
-copy /Y "$(TargetPath)" "%25DEST%25\"</PostBuildEvent>
+copy /Y "$(TargetPath)" "%25DEST%25\"
+copy /Y "%25SETTINGS%25" "%25ROOT%25\GNSettings.cfg"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

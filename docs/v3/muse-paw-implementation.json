@@ -1,0 +1,29 @@
+{
+  "id": "chatcmpl-mxlh5k8xpznnbmnc7oiyij",
+  "object": "chat.completion",
+  "created": 1790162362,
+  "model": "meta/muse-glimmer",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "```csharp\npublic void ApplyParticleSettings(ParticleSystem p, float size, float rate, float speed, float lifetime, float angle, float radius)\n{\n    float cSize = Mathf.Clamp(size, 0.001f, 1f);\n    float cRate = Mathf.Clamp(rate, 0f, 3000f);\n    float cSpeed = Mathf.Clamp(speed, 0f, 100f);\n    float cLifetime = Mathf.Clamp(lifetime, 0.05f, 10f);\n    float cAngle = Mathf.Clamp(angle, 0f, 80f);\n    float cRadius = Mathf.Clamp(radius, 0f, 2f);\n\n    var main = p.main;\n    main.startSize = new ParticleSystem.MinMaxCurve(cSize * 0.5f, cSize * 1.5f);\n    main.startSpeed = cSpeed;\n    main.startLifetime = cLifetime;\n\n    var shape = p.shape;\n    shape.angle = cAngle;\n    shape.radius = cRadius;\n\n    var emission = p.emission;\n    emission.rateOverTime = cRate;\n}\n```",
+        "reasoning_content": "Write only a C# Unity method ApplyParticleSettings(ParticleSystem p, float size, float rate, float speed, float lifetime, float angle, float radius). Set main startSize random .5size..1.5size, startSpeed, startLifetime, shape angle/radius, emission rateOverTime, clamp same limits: size .001..1, rate0..3000 speed0..100 lifetime.05..10 angle0..80 radius0..2. Do not start/stop/clear system. Unity 2019 API. No prose.\n\nWe need output only method code. No prose. Probably just method.\n\nClamp values. Use Mathf.Clamp.\n\nSet main startSize random .5size..1.5size. Need random range. Use Random.Range.\n\nmain = p.main; main.startSize = new ParticleSystem.MinMaxCurve(...)? Unity 2019 API: startSize is ParticleSystem.MinMaxCurve. Can assign.\n\nSimplify: main.startSize = new ParticleSystem.MinMaxCurve(clampedSize*0.5f, clampedSize*1.5f);\n\nstartSpeed = speed clamped\nstartLifetime = lifetime clamped\n\nshape = p.shape; shape.angle = angle clamped; shape.radius = radius clamped\n\nemission = p.emission; emission.rateOverTime = rate clamped\n\nReturn method.\n\nNo prose. Just code.\n\nEnsure method signature.\n\nProbably static? Just method.\n\nOutput code only.\n\n",
+        "tool_calls": []
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 170,
+    "completion_tokens": 537,
+    "total_tokens": 707,
+    "completion_tokens_details": {
+      "reasoning_tokens": 289
+    }
+  },
+  "stats": {},
+  "system_fingerprint": "meta/muse-glimmer"
+}

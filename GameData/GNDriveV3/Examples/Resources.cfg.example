@@ -1,0 +1,19 @@
+// Install ONLY if these names are not already defined by the existing GNdrive mod.
+RESOURCE_DEFINITION
+{
+    name = GNparticle
+    density = 0
+    unitCost = 1
+    flowMode = ALL_VESSEL
+    transfer = PUMP
+    isTweakable = true
+}
+RESOURCE_DEFINITION
+{
+    name = TopologicalDefects
+    density = 0.1
+    unitCost = 0.01
+    flowMode = ALL_VESSEL
+    transfer = PUMP
+    isTweakable = false
+}

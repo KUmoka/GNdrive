@@ -1,0 +1,29 @@
+{
+  "id": "chatcmpl-zzq8e0es3doekvrp0vzgcu",
+  "object": "chat.completion",
+  "created": 1790173546,
+  "model": "meta/muse-glimmer",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "```csharp\nusing System;\n\npublic static class GNSheld\n{\n    public static double RimAlpha(double normalDotView, double strength)\n    {\n        double dot = Math.Abs(normalDotView);\n        dot = Math.Max(0.0, Math.Min(1.0, dot));\n        double s = Math.Max(0.0, Math.Min(1.0, strength));\n        double rim = Math.Pow(1.0 - dot, 3.0) * 0.9 * s;\n        return rim;\n    }\n}\n```\n\nNote: `dot` is |N·V|. Front facing = dot ~1 → 1-dot ~0 → RimAlpha ~0. Rim = dot ~0 → 1-dot ~1 → max rim.",
+        "reasoning_content": "Write only pure C# static double RimAlpha(double normalDotView,double strength) for a GN shield: clamp abs(dot) to0..1; pow(1-dot,3)*0.9*clamp(strength,0,1). System.Math only. Brief note on front vs rim.\n\nWe need output code. Probably just method.\n\nBrief note on front vs rim.\n\nProvide code.",
+        "tool_calls": []
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 120,
+    "completion_tokens": 247,
+    "total_tokens": 367,
+    "completion_tokens_details": {
+      "reasoning_tokens": 80
+    }
+  },
+  "stats": {},
+  "system_fingerprint": "meta/muse-glimmer"
+}

@@ -532,7 +532,7 @@ namespace GNTechnology
         private Color fresnelColor = new Color(0f, 1f, 170f / 255f, 1f);
         private float fresnelAlphaScale = 0.9f;
         private float fresnelPower = 3.0f;
-        private float step = 0.5f * Time.deltaTime;
+        //private float step = 0.5f * Time.deltaTime;
         private float FieldStrength = 0.0f;
         private float target = 0.0f;
 
@@ -575,8 +575,8 @@ namespace GNTechnology
 
             if (texPath == "")
             {
-                Debug.LogWarning("[GN] Texture path is empty.");
-                return;
+                Debug.LogWarning("[GN] Texture path is empty.Particle won't visible");
+                // return; //Only warn.
             }
 
             // テクスチャも設定してみる
@@ -660,7 +660,7 @@ namespace GNTechnology
         {
             // Fielld particle drain
             var myES = part.Modules.GetModule<GNBaseSystem>()?.ES;
-            if (myES != null || myES != DriveState.Depleted)
+            if (myES != null && myES != DriveState.Depleted) // if drive is not depleted, drain particles.
             {
                 amountToDrain = drainRate * dt * Math.Pow(myradius / 10d, 2d);
                 actualDrain = part.RequestResource("GNparticle", amountToDrain);
@@ -674,6 +674,9 @@ namespace GNTechnology
 
         private void FieldUpdate()
         {
+            // local step update.
+            float step = 0.5f * Time.deltaTime;
+
             // update parameters. note that myradius is updated in OnUpdate when ship parts change.
             var main = spherePs.main;
             main.startSize = myradius * 0.01f * myStartSize;

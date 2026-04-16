@@ -407,6 +407,7 @@ namespace GNTechnology
             // EC deplition check, 0.5% threshold
             if (ECDepletionCheck(EC.amount, EC.maxAmount, fraction, ECReqGen, ref ps))
             {
+                ps.part.RequestResource("ElectricCharge", -1 * Pulled); // return pulled EC
                 return;
             }
 
@@ -414,6 +415,10 @@ namespace GNTechnology
             // only if TRANS-AM off.
             if (isTaOn)
             {
+                if (Pulled > 0)
+                {
+                    ps.part.RequestResource("ElectricCharge", -1 * Pulled); // return pulled EC
+                }
                 return;
             }
 
