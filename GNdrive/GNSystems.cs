@@ -1,4 +1,4 @@
-// GN Drive V3 0.2.0-alpha. Core units: kg, m, s, N, N.m; budgets: kN, particles.
+﻿// GN Drive V3 0.2.0-alpha. Core units: kg, m, s, N, N.m; budgets: kN, particles.
 // Define GN_CORE_ONLY for a build without Unity/KSP.
 using System;
 using System.Collections.Generic;
@@ -99,8 +99,9 @@ namespace GNSystems.Core
     }
     public sealed class DriveDefinition
     {
-        public bool Propulsion, Generation, TD, TransAM, MultiDrive, Field, Gen1;
-        public double Power = 100, MaxGContribution = 5, ParticleGenerationRate = 10, ECPerParticle = 1, ECPerTDSecond = 2, TransAMRatio = 3;
+        public bool Propulsion, Generation, TD, TDBlanket, TransAM, MultiDrive, Field, Gen1;
+        public double BlanketECGenerationRate = 200;
+        public double Power = 100, MaxGContribution = 5, ParticleGenerationRate = 10, ECPerParticle = 10, ECPerTDSecond = 2, TransAMRatio = 3;
         public double MaxTorqueNm = 10000, ParticlePerNmSecond = 0.0001, FieldReferenceDiameter = 10, FieldParticleRate = 1, Individuality = 0.5;
         public DriveDefinition Copy()
         {
@@ -108,7 +109,7 @@ namespace GNSystems.Core
         }
         public void Validate()
         {
-            foreach (double v in new[] { Power, MaxGContribution, ParticleGenerationRate, ECPerTDSecond, MaxTorqueNm, FieldParticleRate, Individuality })
+            foreach (double v in new[] { Power, MaxGContribution, ParticleGenerationRate, BlanketECGenerationRate, ECPerTDSecond, MaxTorqueNm, FieldParticleRate, Individuality })
                 Numbers.Nonnegative(v, "rating");
             Numbers.Positive(ECPerParticle, "ECPerParticle");
             Numbers.Positive(ParticlePerNmSecond, "ParticlePerNmSecond");
@@ -121,14 +122,37 @@ namespace GNSystems.Core
     public sealed class DriveState
     {
         public uint Id; public DriveDefinition Definition = new DriveDefinition();
-        public bool Engine, AG, Hover, TA, Generate = true, Joined, Repose, Depleted, TALocked;
+        public bool Engine, AG, Hover, TA, Generate = true, Blanket, BlanketStarved, Joined, Repose, Depleted, TALocked;
         public int Group;
-        public double Tank, TankCapacity, TDQuantity, InternalEC, InternalParticles, Sync = 1, Generated;
+        public double Tank, TankCapacity, TDQuantity, TDCapacity, InternalEC, InternalParticles, Sync = 1, Generated, BlanketECGenerated, BaryonMassKg;
         public bool Original
         {
             get
             {
                 return Definition.TD && TDQuantity > 0;
+            }
+        }
+        public bool UsesTDBlanket
+        {
+            get
+            {
+                return Definition.TDBlanket && Definition.TD;
+            }
+        }
+        public double TDFraction
+        {
+            get
+            {
+                return UsesTDBlanket ? TDResourceFraction : 0;
+            }
+        }
+        public double TDResourceFraction
+        {
+            get
+            {
+                if (!Definition.TD || TDCapacity <= 0 || TDQuantity <= 0)
+                    return 0;
+                return Numbers.Clamp(TDQuantity / TDCapacity, 0, 1);
             }
         }
         public bool Full
@@ -148,11 +172,28 @@ namespace GNSystems.Core
     }
     public sealed class VesselSettings
     {
+        public double ECMargin = 0.2;
         public bool SafeGuard = true, Field;
         public double AccelerationG = 5, RotationShare = 0.2, HoverTime = 0.5, BrakeTime = 0.5, Deadband = 0.02;
     }
+    public static class ECReservePolicy
+    {
+        public static double Draw(double demand, double stored, double capacity, double margin)
+        {
+            // Zero explicitly restores legacy unrestricted generation.
+            if (margin <= 0) return Math.Min(demand, stored);
+            double available = Math.Max(0, stored - capacity * margin);
+            double range = capacity * (1 - margin);
+            double factor = range > 0 ? Numbers.Clamp(available / range, 0, 1) : 0;
+            return Math.Min(available, demand * factor);
+        }
+    }
     public static class GNMultiDriveUnit
     {
+        public static bool Unsynchronized(DriveState d)
+        {
+            return d.Joined && !d.Repose && d.Definition.MultiDrive && d.Group == 0 && d.Sync <= 0.5;
+        }
         public static double Coefficient(IList<double> values)
         {
             if (values == null)
@@ -180,6 +221,25 @@ namespace GNSystems.Core
                 d.Sync = members.Contains(d) ? factor : 1;
         }
     }
+    public static class GNIndividuality
+    {
+        public const uint BucketCount = 1024;
+        public static double FromPersistentId(uint id)
+        {
+            // Avalanche adjacent KSP persistent IDs, then quantize to an exactly
+            // representable binary fraction. Collisions remain possible by design.
+            unchecked
+            {
+                uint x = id + 0x9E3779B9u;
+                x ^= x >> 16;
+                x *= 0x85EBCA6Bu;
+                x ^= x >> 13;
+                x *= 0xC2B2AE35u;
+                x ^= x >> 16;
+                return (x & (BucketCount - 1)) / (double)BucketCount;
+            }
+        }
+    }
     public static class HoverLaw
     {
         public static double Support(double gravity, double verticalSpeed, double dt, double responseTime, double accelerationLimit, double deadband)
@@ -199,7 +259,7 @@ namespace GNSystems.Core
     }
     public enum CommandKind
     {
-        Engine, AG, Hover, TransAM, Generation, Join, Repose, SafeGuard, Field
+        Engine, AG, Hover, TransAM, Generation, Blanket, Join, Repose, SafeGuard, Field
     }
     public sealed class CommandGate
     {
@@ -217,11 +277,15 @@ namespace GNSystems.Core
     {
         public static bool GenerationRequested(IEnumerable<DriveState> drives)
         {
-            return drives.Any(d => d.Definition.Generation && (d.Generate || d.Original));
+            return drives.Any(d => d.Definition.Generation && d.Generate);
         }
         public static void Reconcile(IList<DriveState> drives, VesselSettings settings)
         {
-            foreach (var d in drives) if (d.Hover) d.AG = false;
+            foreach (var d in drives)
+            {
+                if (d.Hover) d.AG = false;
+                d.Blanket = d.UsesTDBlanket;
+            }
             if (!GenerationRequested(drives)) settings.SafeGuard = false;
         }
     }
@@ -242,8 +306,8 @@ namespace GNSystems.Core
             }
             if (kind == CommandKind.Repose && value && d.TA)
                 return "Cannot repose during Trans-AM.";
-            if (kind == CommandKind.Generation && !value && d.Original)
-                return "TD requires generation enabled.";
+            if (kind == CommandKind.Blanket)
+                return "TD Blanket is automatic.";
             return null;
         }
         static void Set(DriveState d, CommandKind k, bool v)
@@ -271,6 +335,8 @@ namespace GNSystems.Core
                     break;
                 case CommandKind.Generation:
                     d.Generate = v;
+                    break;
+                case CommandKind.Blanket:
                     break;
                 case CommandKind.Repose:
                     d.Repose = v;
@@ -348,23 +414,6 @@ namespace GNSystems.Core
                 return true;
             }
             var targets = d.Joined && kind != CommandKind.Repose ? drives.Where(x => x.Joined && x.Group == d.Group && !x.Repose).ToList() : new List<DriveState> { d };
-            if (kind == CommandKind.Generation && !value)
-            {
-                foreach (var t in targets)
-                {
-                    if (t.Original)
-                    {
-                        t.Generate = true;
-                        t.Joined = false;
-                    }
-                    else
-                        t.Generate = false;
-                }
-                if (d.Original)
-                    reason = "TD generation retained; conflicting drive left synchronization.";
-                StateRules.Reconcile(drives, settings);
-                return true;
-            }
             foreach (var t in targets)
             {
                 reason = Check(t, kind, value, gen1);
@@ -393,6 +442,27 @@ namespace GNSystems.Core
         }
         double Take(double requested); double Put(double offered);
     }
+    public interface IBaryonPort
+    {
+        double TakeEnergy(double requestedEC);
+    }
+    public static class MassEnergy
+    {
+        public const double JoulesPerEC = 1000;
+        public const double SpeedOfLight = 299792458;
+        public static double KilogramsForEC(double ec)
+        {
+            Numbers.Nonnegative(ec, "ec");
+            return ec * JoulesPerEC / (SpeedOfLight * SpeedOfLight);
+        }
+        // KSP density is metric tonnes per resource unit. The factors of 1000
+        // for tonnes->kg and joules->EC cancel exactly at 1 EC = 1 kJ.
+        public static double ECPerResourceUnit(double densityTonnes)
+        {
+            Numbers.Positive(densityTonnes, "density");
+            return densityTonnes * SpeedOfLight * SpeedOfLight;
+        }
+    }
     public sealed class StepInput
     {
         public double Dt, MassKg, FieldDiameter = 10, Throttle; public bool Active = true, Packed, Brakes, Rcs;
@@ -406,7 +476,7 @@ namespace GNSystems.Core
     public sealed class EffectPlan
     {
         public Vec SupportKN, BrakeKN, ThrustKN, TorqueNm;
-        public double TorqueRate, FieldMaintenance, FieldRepulsionRate, FieldRequestedRate, ReservedPower, MaxG, EffectiveAccelerationG;
+        public double TorqueRate, FieldMaintenance, FieldRepulsionRate, FieldRequestedRate, ReservedPower, MaxG, ConfigurationMaxG, EffectiveAccelerationG;
         public bool Field; public readonly List<FieldTarget> Targets = new List<FieldTarget>();
         public Vec ForceKN
         {
@@ -423,8 +493,8 @@ namespace GNSystems.Core
     public sealed class StepResult
     {
         public EffectPlan Effects = new EffectPlan();
-        public double Generated, ECGenerated, ECTaken, ECUsed, ECStored, ECSpilled, ParticleTaken, Consumed, ParticleStored, ParticleSpilled;
-        public bool SupplyLimited, TAForcedOff;
+        public double Generated, ECGenerated, BlanketECGenerated, BaryonMassKg, ECTaken, ECUsed, ECStored, ECSpilled, ParticleTaken, Consumed, ParticleStored, ParticleSpilled;
+        public bool SupplyLimited, TAForcedOff, BlanketStarved;
         public string FieldStatus;
         public Vec ForceN
         {
@@ -445,14 +515,9 @@ namespace GNSystems.Core
     {
         public static double Rate(DriveState d)
         {
-            return d.Definition.Generation && (d.Generate || d.Original) ? d.Definition.ParticleGenerationRate * d.Sync : 0;
-        }
-    }
-    public static class GNTopologicalDefectsUnit
-    {
-        public static double Rate(DriveState d)
-        {
-            return d.Original ? d.Definition.ECPerTDSecond * d.TDQuantity * d.Sync : 0;
+            if (!d.Definition.Generation || !d.Generate)
+                return 0;
+            return d.Definition.ParticleGenerationRate * d.Sync;
         }
     }
     public static class GNTransAMUnit
@@ -531,6 +596,23 @@ public class VisualColorTransition
 
     public static class DriveColorPolicy
     {
+        static readonly Vec OriginalGreen = new Vec(0, 1, 0.65);
+        static readonly Vec DefaultGeneratorRed = new Vec(1, 0, 0.15);
+        public static Vec TDGradient(double fraction, Vec zeroTDColor)
+        {
+            double t = Numbers.Clamp(fraction, 0, 1);
+            return zeroTDColor + (OriginalGreen - zeroTDColor) * t;
+        }
+        public static Vec NormalFor(DriveState drive, Vec shared)
+        {
+            return NormalFor(drive, shared, DefaultGeneratorRed);
+        }
+        public static Vec NormalFor(DriveState drive, Vec shared, Vec zeroTDColor)
+        {
+            if (drive == null || !drive.Definition.Generation)
+                return shared;
+            return drive.UsesTDBlanket && drive.TDResourceFraction > 0 ? OriginalGreen : zeroTDColor;
+        }
         public static Vec SharedNormal(IEnumerable<DriveState> drives)
         {
             // Colour provenance follows installed capability, including stopped/full generators.
@@ -552,6 +634,22 @@ public class VisualColorTransition
                 if (!double.TryParse(parts[i].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v[i]) || !Numbers.Finite(v[i]) || v[i] < 0 || v[i] > 1)
                     throw new FormatException("GeneratorColor components must be finite values in 0..1.");
             return new Vec(v[0], v[1], v[2]);
+        }
+    }
+    public static class AfterimagePolicy
+    {
+        public static double Advance(double elapsed, double duration, double dt, bool accelerating)
+        {
+            return Numbers.Clamp(elapsed + (accelerating ? 1 : -1) * Math.Max(0, dt), 0, Math.Max(0.01, duration));
+        }
+        public static double Extension(double elapsed, double duration)
+        {
+            double t = Numbers.Clamp(elapsed / Math.Max(0.01, duration), 0, 1);
+            return t * t * (3 - 2 * t);
+        }
+        public static double Distance(double diameter, double divisor, double spacing, int index)
+        {
+            return Math.Max(0, diameter) / Math.Max(1, divisor) * Math.Max(0, spacing) * (index + 1);
         }
     }
     public static class ParticleVisualPolicy
@@ -609,7 +707,9 @@ public class VisualColorTransition
         {
             var p = new EffectPlan();
             var running = drives.Where(x => x.Running).ToList();
-            p.MaxG = running.Sum(x => x.Definition.MaxGContribution);
+            p.MaxG = running.Sum(x => x.Definition.MaxGContribution * x.Sync);
+            // Configuration remains available while engines are stopped; actual force uses MaxG.
+            p.ConfigurationMaxG = drives.Where(x => x.Definition.Propulsion).Sum(x => x.Definition.MaxGContribution * x.Sync);
             p.EffectiveAccelerationG = Numbers.Clamp(settings.AccelerationG, 0, p.MaxG) * GNTransAMUnit.AccelerationMultiplier(running);
             if (!input.Active || input.Packed || input.MassKg <= 0)
                 return p;
@@ -703,7 +803,7 @@ public class VisualColorTransition
         {
             Numbers.Nonnegative(budget, "budget");
             Numbers.Positive(dt, "dt");
-            var p = new EffectPlan { MaxG = plan.MaxG, EffectiveAccelerationG = plan.EffectiveAccelerationG, ReservedPower = plan.ReservedPower, FieldRequestedRate = plan.FieldRequestedRate };
+            var p = new EffectPlan { MaxG = plan.MaxG, ConfigurationMaxG = plan.ConfigurationMaxG, EffectiveAccelerationG = plan.EffectiveAccelerationG, ReservedPower = plan.ReservedPower, FieldRequestedRate = plan.FieldRequestedRate };
             p.SupportKN = plan.SupportKN.Limit(budget / dt);
             // Reserve particle maintenance immediately after support. It is not a force/Power cost.
             double maintenance = plan.FieldMaintenance * dt;
@@ -741,6 +841,10 @@ public class VisualColorTransition
         }
         public StepResult Step(IList<DriveState> source, VesselSettings settings, StepInput input, IResourcePort particles, IResourcePort ec)
         {
+            return Step(source, settings, input, particles, ec, null);
+        }
+        public StepResult Step(IList<DriveState> source, VesselSettings settings, StepInput input, IResourcePort particles, IResourcePort ec, IBaryonPort baryons)
+        {
             Numbers.Positive(input.Dt, "dt");
             Numbers.Nonnegative(input.MassKg, "mass");
             Numbers.Nonnegative(input.FieldDiameter, "diameter");
@@ -763,11 +867,12 @@ public class VisualColorTransition
                 Numbers.Nonnegative(d.Tank, "tank");
                 Numbers.Nonnegative(d.TankCapacity, "capacity");
                 Numbers.Nonnegative(d.TDQuantity, "TD");
+                Numbers.Nonnegative(d.TDCapacity, "TD capacity");
                 if (d.Full)
                     d.TALocked = false;
-                if (d.Original)
-                    d.Generate = true;
                 d.Generated = 0;
+                d.BlanketECGenerated = 0;
+                d.BaryonMassKg = 0;
             }
             StateRules.Reconcile(drives, settings);
             GNMultiDriveUnit.Update(drives);
@@ -776,25 +881,52 @@ public class VisualColorTransition
             double pStart = Numbers.Nonnegative(particles.Amount, "particle amount");
             Numbers.Nonnegative(particles.Capacity, "particle capacity");
             double pFree = Numbers.Nonnegative(particles.FreeSpace, "particle free space");
-            Numbers.Nonnegative(ec.Amount, "EC amount");
-            Numbers.Nonnegative(ec.Capacity, "EC capacity");
+            double externalECBudget = Numbers.Nonnegative(ec.Amount, "EC amount");
+            double ecCapacity = Numbers.Nonnegative(ec.Capacity, "EC capacity");
+            Numbers.Nonnegative(settings.ECMargin, "EC margin");
+            if (settings.ECMargin > 1) throw new ArgumentOutOfRangeException("EC margin");
+            double chargingECFree = Numbers.Nonnegative(ec.FreeSpace, "EC free space");
             double demand = plan.Cost(input.Dt), wanted = demand + pFree, requiredEC = 0;
             var generation = new Dictionary<DriveState, double>();
             foreach (var d in drives)
             {
-                r.ECGenerated += GNTopologicalDefectsUnit.Rate(d) * input.Dt;
-                double amount = Math.Min(wanted, GNParticleGenerationUnit.Rate(d) * input.Dt);
+                double capacity = GNParticleGenerationUnit.Rate(d) * input.Dt;
+                Numbers.Nonnegative(capacity, "particle generation capacity");
+                double amount = Math.Min(wanted, capacity);
                 generation[d] = amount;
-                wanted -= amount;
+                wanted = Math.Max(0, wanted - amount);
                 requiredEC += amount * d.Definition.ECPerParticle;
             }
-            // Validate derived quantities before making the first irreversible resource write.
             Numbers.Nonnegative(demand, "effect cost");
+            Numbers.Nonnegative(requiredEC, "generation EC demand");
+            if (!plan.ForceKN.IsFinite || !plan.TorqueNm.IsFinite) throw new ArgumentException("Effect overflow");
+            var blanketDemand = new Dictionary<DriveState, double>();
+            // Include same-step furnace consumption even when storage starts full.
+            double ecRoom = Numbers.Nonnegative(chargingECFree + requiredEC, "EC receiving budget");
+            foreach (var d in drives)
+            {
+                double capacity = d.UsesTDBlanket ? d.Definition.BlanketECGenerationRate * d.TDFraction * input.Dt : 0;
+                Numbers.Nonnegative(capacity, "blanket capacity");
+                blanketDemand[d] = capacity;
+            }
+            foreach (var d in drives)
+            {
+                double request = Math.Min(ecRoom, blanketDemand[d]);
+                double supplied = request > 0 && baryons != null ? Receipt(baryons.TakeEnergy(request), request) : 0;
+                d.BlanketStarved = request > 0 && !Numbers.Covers(request, supplied);
+                r.BlanketStarved |= d.BlanketStarved;
+                d.BlanketECGenerated = supplied;
+                d.BaryonMassKg = MassEnergy.KilogramsForEC(supplied);
+                r.BlanketECGenerated += supplied;
+                r.BaryonMassKg += d.BaryonMassKg;
+                r.ECGenerated += supplied;
+                ecRoom = Math.Max(0, ecRoom - supplied);
+            }
+            // Validate derived quantities before making the first irreversible resource write.
             Numbers.Nonnegative(requiredEC, "EC demand");
             Numbers.Nonnegative(r.ECGenerated, "TD generation");
-            if (!plan.ForceKN.IsFinite || !plan.TorqueNm.IsFinite)
-                throw new ArgumentException("Effect overflow");
             double ecNeed = Math.Max(0, requiredEC - r.ECGenerated);
+            ecNeed = ECReservePolicy.Draw(ecNeed, externalECBudget, ecCapacity, settings.ECMargin);
             r.ECTaken = ecNeed > 0 ? Receipt(ec.Take(ecNeed), ecNeed) : 0;
             double ecScale = requiredEC > 0 ? Math.Min(1, (r.ECGenerated + r.ECTaken) / requiredEC) : 0;
             foreach (var d in drives)
@@ -865,6 +997,31 @@ namespace GNSystems
     using System.Globalization;
 
 #if !GN_ADAPTER_TEST
+    internal sealed class GNTDBlanketSettings
+    {
+        public string[] ResourceNames = { "IntakeAir", "MonoPropellant", "LiquidFuel", "Oxidizer" };
+        static GNTDBlanketSettings current;
+        public static GNTDBlanketSettings Current { get { return current ?? (current = Load()); } }
+        static GNTDBlanketSettings Load()
+        {
+            var result = new GNTDBlanketSettings();
+            try
+            {
+                var roots = GameDatabase.Instance.GetConfigNodes("GNDRIVE_SETTINGS");
+                if (roots == null || roots.Length == 0) return result;
+                if (roots.Length != 1) throw new InvalidOperationException("Expected exactly one GNDRIVE_SETTINGS node");
+                var node = roots[0].GetNode("TDBlanket");
+                if (node == null) return result;
+                var names = node.GetValues("Resource").Where(x => !string.IsNullOrEmpty(x))
+                    .Select(x => x.Trim()).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                if (names.Length > 0) result.ResourceNames = names;
+                Debug.Log("[GN V3] TD Blanket baryons: " + string.Join(", ", result.ResourceNames));
+            }
+            catch (Exception e) { Debug.LogError("[GN V3] Invalid TD Blanket settings; using defaults: " + e.Message); }
+            return result;
+        }
+    }
+
     internal sealed class GNVesselGlowSettings
     {
         public bool Enabled = true;
@@ -872,7 +1029,12 @@ namespace GNSystems
         public float Transparency = 0.8f;
         public float ShellScale = 1.02f;
         public float ResponseSpeed = 2f;
-        public Color TransAMColor = new Color(1, 0.2f, 0, 1);
+        public bool AfterimagesEnabled = true;
+        public int AfterimageCount = 4;
+        public float AfterimageSizeDivisor = 8f;
+        public float AfterimageExtendTime = 1f;
+        public float AfterimageSpacing = 1f, AfterimageOpacity = 0.3f, AfterimageThreshold = 0.5f;
+        public Color TransAMColor = new Color(1, 0.05f, 0.25f, 1);
         public Color TransAMCoreColor = new Color(1, 0.95f, 0.95f, 1);
         public float TransAMCoreIntensity = 4f;
         public bool GNLightEnabled = true;
@@ -911,6 +1073,19 @@ namespace GNSystems
                 result.Transparency = ReadFloat(glow, "Transparency", result.Transparency, 0, 1);
                 result.ShellScale = ReadFloat(glow, "ShellScale", result.ShellScale, 1, 1.1f);
                 result.ResponseSpeed = ReadFloat(glow, "ResponseSpeed", result.ResponseSpeed, 0.01f, 20);
+                result.AfterimagesEnabled = ReadBool(glow, "AfterimagesEnabled", result.AfterimagesEnabled);
+                string countRaw = glow.GetValue("AfterimageCount");
+                int count;
+                if (countRaw != null)
+                {
+                    if (!int.TryParse(countRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out count)) throw new FormatException("Invalid AfterimageCount");
+                    result.AfterimageCount = Math.Max(0, Math.Min(16, count));
+                }
+                result.AfterimageSizeDivisor = ReadFloat(glow, "AfterimageSizeDivisor", result.AfterimageSizeDivisor, 1, 1000);
+                result.AfterimageExtendTime = ReadFloat(glow, "AfterimageExtendTime", result.AfterimageExtendTime, 0.01f, 10);
+                result.AfterimageSpacing = ReadFloat(glow, "AfterimageSpacing", result.AfterimageSpacing, 0, 100);
+                result.AfterimageOpacity = ReadFloat(glow, "AfterimageOpacity", result.AfterimageOpacity, 0, 1);
+                result.AfterimageThreshold = ReadFloat(glow, "AfterimageThreshold", result.AfterimageThreshold, 0.01f, 100);
                 result.ExcludedObjectKeywords = glow.GetValues("ExcludeObjectKeyword")
                     .Where(x => !string.IsNullOrEmpty(x)).Select(x => x.Trim()).Where(x => x.Length > 0)
                     .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -972,6 +1147,7 @@ namespace GNSystems
         internal Color GeneratorTint = new Color(1, 0, 0.15f);
         [KSPField] public bool HasGeneration = false;
         [KSPField] public bool HasTD = false;
+        [KSPField] public bool HasTDBlanket = true;
         [KSPField] public bool HasTransAM = true;
         [KSPField] public bool HasMultiDrive = true;
         [KSPField] public bool HasField = false;
@@ -979,14 +1155,15 @@ namespace GNSystems
         [KSPField] public double Power = 100;
         [KSPField] public double MaxGContribution = 5;
         [KSPField] public double ParticleGenerationRate = 10;
-        [KSPField] public double ECPerParticle = 1;
+        [KSPField] public double ECPerParticle = 10;
+        [KSPField] public double BlanketECGenerationRate = 200;
         [KSPField] public double ECPerTDSecond = 2;
         [KSPField] public double TransAMRatio = 3;
         [KSPField] public double MaxTorqueNm = 10000;
         [KSPField] public double ParticlePerNmSecond = 0.0001;
         [KSPField] public double FieldReferenceDiameter = 10;
         [KSPField] public double FieldParticleRate = 1;
-        [KSPField] public double Individuality = 0.5;
+        [KSPField(isPersistant = true, guiActive = true, guiActiveEditor = true, guiName = "Individuality", guiFormat = "F6")] public double Individuality = -1;
         [KSPField] public double InitialInternalEC = 1;
         [KSPField] public double InitialInternalParticles = 1;
         [KSPField] public string RotorTransform = "rotor";
@@ -1002,6 +1179,9 @@ namespace GNSystems
         [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = false, guiName = "Particle lifetime"), UI_FloatRange(minValue = 0.05f, maxValue = 10f, stepIncrement = 0.05f)] public float ParticleLifetime = 1f;
         [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = false, guiName = "Full-load cone angle"), UI_FloatRange(minValue = 0f, maxValue = 80f, stepIncrement = 1f)] public float ParticleConeAngle = 12f;
         [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = false, guiName = "Particle outlet radius"), UI_FloatRange(minValue = 0f, maxValue = 2f, stepIncrement = 0.01f)] public float ParticleRadius = 0.04f;
+        [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = false, guiName = "Ring glow size"), UI_FloatRange(minValue = 0.01f, maxValue = 2f, stepIncrement = 0.01f)] public float ParticleGlowSize = 0.3f;
+        [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = false, guiName = "Ring glow density"), UI_FloatRange(minValue = 0f, maxValue = 1000f, stepIncrement = 10f)] public float ParticleGlowRate = 120f;
+        [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = false, guiName = "Ring glow intensity"), UI_FloatRange(minValue = 0f, maxValue = 2f, stepIncrement = 0.05f)] public float ParticleGlowIntensity = 0.8f;
         [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = false, guiName = "Rotor max deg/s"), UI_FloatRange(minValue = 0f, maxValue = 3600f, stepIncrement = 5f)] public float RotorSpeed = 60;
         [KSPField(isPersistant = true, guiName = "Condenser max deg/s"), UI_FloatRange(minValue = 0f, maxValue = 3600f, stepIncrement = 5f)] public float CondenserRotorSpeed = 60;
         [KSPField] public float DeployDistance = 0.2f;
@@ -1017,7 +1197,7 @@ namespace GNSystems
         [KSPField(isPersistant = true, guiName = "Idle cone angle"), UI_FloatRange(minValue = 0f, maxValue = 80f, stepIncrement = 1f)] public float ParticleIdleAngle = 35;
         [KSPField(guiActive = false, guiName = "Particle visual load", guiFormat = "F2")] public float particleVisualLoad;
         [KSPField(guiActive = false, guiName = "Effective particles /s", guiFormat = "F1")] public float particleEffectiveRate;
-        static readonly string[] TuningFields = { "ParticleSize", "ParticleRate", "ParticleSpeed", "ParticleAcceleration", "ParticleLifetime", "ParticleConeAngle", "ParticleRadius", "RotorSpeed", "ParticleIdleSpeed", "ParticleIdleRate", "ParticleIdleAngle", "particleVisualLoad", "particleEffectiveRate", "CondenserRotorSpeed" };
+        static readonly string[] TuningFields = { "ParticleSize", "ParticleRate", "ParticleSpeed", "ParticleAcceleration", "ParticleLifetime", "ParticleConeAngle", "ParticleRadius", "ParticleGlowSize", "ParticleGlowRate", "ParticleGlowIntensity", "RotorSpeed", "ParticleIdleSpeed", "ParticleIdleRate", "ParticleIdleAngle", "particleVisualLoad", "particleEffectiveRate", "CondenserRotorSpeed" };
         [KSPEvent(guiActive = true, guiActiveEditor = true, guiName = "Show/hide visual tuning")]
         public void ToggleVisualTuning()
         {
@@ -1057,29 +1237,35 @@ namespace GNSystems
         [KSPField(isPersistant = true)] public double internalEC;
         [KSPField(isPersistant = true)] public double internalParticles;
         [KSPField(isPersistant = true)] public string selectedProfile = "";
-        [KSPField(isPersistant = true, guiActive = true, guiName = "Propulsion")] public bool engineOn;
-        [KSPField(isPersistant = true, guiActive = true, guiName = "Anti-gravity")] public bool agOn;
-        [KSPField(isPersistant = true, guiActive = true, guiName = "Hover")] public bool hoverOn;
-        [KSPField(isPersistant = true, guiActive = true, guiName = "Trans-AM")] public bool taOn;
-        [KSPField(isPersistant = true, guiActive = true, guiName = "Generation")] public bool generationOn = true;
-        [KSPField(isPersistant = true, guiActive = true, guiName = "Synchronized")] public bool joined;
+        [KSPField(isPersistant = true, guiActive = true, guiName = "Propulsion"), UI_Toggle(enabledText = "ON", disabledText = "OFF")] public bool engineOn;
+        [KSPField(isPersistant = true, guiActive = true, guiName = "Anti-gravity"), UI_Toggle(enabledText = "ON", disabledText = "OFF")] public bool agOn;
+        [KSPField(isPersistant = true, guiActive = true, guiName = "Hover"), UI_Toggle(enabledText = "ON", disabledText = "OFF")] public bool hoverOn;
+        [KSPField(isPersistant = true, guiActive = true, guiName = "Trans-AM"), UI_Toggle(enabledText = "ON", disabledText = "OFF")] public bool taOn;
+        [KSPField(isPersistant = true, guiActive = true, guiName = "Generation"), UI_Toggle(enabledText = "ON", disabledText = "OFF")] public bool generationOn = true;
+        [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = false, guiName = "TD Blanket")] public bool blanketOn;
+        [KSPField(isPersistant = true)] public bool blanketStarved;
+        [KSPField(isPersistant = true, guiActive = true, guiName = "Synchronized"), UI_Toggle(enabledText = "ON", disabledText = "OFF")] public bool joined;
         [KSPField(isPersistant = true)] public int group;
-        [KSPField(isPersistant = true, guiActive = true, guiName = "Repose")] public bool repose;
+        [KSPField(isPersistant = true, guiActive = true, guiName = "Repose"), UI_Toggle(enabledText = "ON", disabledText = "OFF")] public bool repose;
         [KSPField(isPersistant = true, guiActive = true, guiName = "Depleted")] public bool depleted;
         [KSPField(isPersistant = true)] public bool taLocked;
-        [KSPField(isPersistant = true, guiActive = true, guiName = "SafeGuard")] public bool safeGuard = true;
-        [KSPField(isPersistant = true, guiActive = true, guiName = "GN Field")] public bool fieldOn;
+        [KSPField(isPersistant = true, guiActive = true, guiName = "SafeGuard"), UI_Toggle(enabledText = "ON", disabledText = "OFF")] public bool safeGuard = true;
+        [KSPField(isPersistant = true, guiActive = true, guiName = "GN Field"), UI_Toggle(enabledText = "ON", disabledText = "OFF")] public bool fieldOn;
         [KSPField(guiActive = true, guiName = "GN Field status")] public string fieldStatus = "OFF";
         [KSPField(isPersistant = true, guiActive = true, guiName = "Acceleration", guiUnits = " G"), UI_FloatRange(minValue = 0, maxValue = 50, stepIncrement = 0.1f)] public float accelerationG = 5;
         [KSPField(isPersistant = true, guiActive = true, guiName = "Rotation share"), UI_FloatRange(minValue = 0, maxValue = 1, stepIncrement = 0.05f)] public float rotationShare = 0.2f;
+        [KSPField(isPersistant = true, guiActive = true, guiActiveEditor = true, guiName = "EC reserve margin", guiFormat = "F2"), UI_FloatRange(minValue = 0, maxValue = 1, stepIncrement = 0.01f)] public float ecMargin = 0.2f;
         [KSPField(guiActive = true, guiName = "Effective accel target", guiUnits = " G", guiFormat = "F2")] public double effectiveAccelerationG;
         [KSPField(guiActive = true, guiName = "GN V3 status")] public string status = "Initializing";
         [KSPField(guiActive = true, guiName = "Particle generation", guiUnits = " /s", guiFormat = "F2")] public double generationRate;
+        [KSPField(guiActive = true, guiName = "TD Blanket status")] public string blanketStatus = "OFF";
+        [KSPField(guiActive = true, guiName = "Blanket EC", guiUnits = " EC/s", guiFormat = "F2")] public double blanketECRate;
+        [KSPField(guiActive = true, guiName = "Baryon use", guiUnits = " kg/s", guiFormat = "E3")] public double baryonRate;
         [KSPField(guiActive = true, guiName = "Vessel consumption", guiUnits = " /s", guiFormat = "F2")] public double consumptionRate;
         [KSPField(guiActive = true, guiName = "Synchronization", guiFormat = "F3")] public double syncFactor = 1;
         internal DriveState State;
         internal string ConfigurationError;
-        internal float PublishedAcceleration, PublishedRotation;
+        internal float PublishedAcceleration, PublishedRotation, PublishedECMargin;
         internal GNDriveV3Visuals Visuals;
         DriveDefinition baseline;
         ConfigNode[] profiles = new ConfigNode[0];
@@ -1090,15 +1276,32 @@ namespace GNSystems
             if (node.HasNode("GN_PROFILE"))
                 profiles = node.GetNodes("GN_PROFILE");
         }
+        public override void OnCopy(PartModule fromModule)
+        {
+            base.OnCopy(fromModule);
+            Individuality = GNIndividuality.FromPersistentId(part.persistentId);
+        }
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
             RefreshTuning();
+            ConfigureStateToggles();
+            bool showBlanket = HasTDBlanket && HasTD;
+            Fields["blanketOn"].guiActive = false;
+            Fields["blanketOn"].guiActiveEditor = false;
+            Fields["blanketStatus"].guiActive = showBlanket;
+            Fields["blanketECRate"].guiActive = showBlanket;
+            Fields["baryonRate"].guiActive = showBlanket;
+            Events["ToggleBlanket"].guiActive = false;
+            Events["ToggleBlanket"].guiActiveEditor = false;
+            Actions["BlanketAction"].active = false;
             if (HasPropulsion) part.stagingIcon = "LIQUID_ENGINE";
             try
             {
                 if (schemaVersion != 1)
                     throw new InvalidOperationException("Unsupported GN state version");
+                if (Individuality < 0)
+                    Individuality = GNIndividuality.FromPersistentId(part.persistentId);
                 if (!initialized)
                 {
                     internalEC = Numbers.Nonnegative(InitialInternalEC, "InitialInternalEC");
@@ -1110,6 +1313,7 @@ namespace GNSystems
                     Propulsion = HasPropulsion,
                     Generation = HasGeneration,
                     TD = HasTD,
+                    TDBlanket = HasTDBlanket,
                     TransAM = HasTransAM,
                     MultiDrive = HasMultiDrive,
                     Field = HasField,
@@ -1119,6 +1323,7 @@ namespace GNSystems
                     ParticleGenerationRate = ParticleGenerationRate,
                     ECPerParticle = ECPerParticle,
                     ECPerTDSecond = ECPerTDSecond,
+                    BlanketECGenerationRate = BlanketECGenerationRate,
                     TransAMRatio = TransAMRatio,
                     MaxTorqueNm = MaxTorqueNm,
                     ParticlePerNmSecond = ParticlePerNmSecond,
@@ -1143,6 +1348,8 @@ namespace GNSystems
                     Hover = hoverOn,
                     TA = taOn,
                     Generate = generationOn,
+                    Blanket = blanketOn,
+                    BlanketStarved = blanketStarved,
                     Joined = joined,
                     Group = group,
                     Repose = repose,
@@ -1159,6 +1366,7 @@ namespace GNSystems
                 }
                 PublishedAcceleration = accelerationG;
                 PublishedRotation = rotationShare;
+                PublishedECMargin = ecMargin;
                 Visuals = new GNDriveV3Visuals(this);
                 status = "Ready";
                 GameEvents.onVariantApplied.Add(VariantApplied);
@@ -1196,7 +1404,7 @@ namespace GNSystems
             if (matches.Length > 1)
                 throw new InvalidOperationException("Duplicate GN_PROFILE variant");
             if (matches.Length == 1)
-                foreach (string name in new[] { "Power", "MaxGContribution", "ParticleGenerationRate", "ECPerParticle", "ECPerTDSecond", "TransAMRatio", "MaxTorqueNm", "ParticlePerNmSecond", "FieldReferenceDiameter", "FieldParticleRate" })
+                foreach (string name in new[] { "Power", "MaxGContribution", "ParticleGenerationRate", "BlanketECGenerationRate", "ECPerParticle", "ECPerTDSecond", "TransAMRatio", "MaxTorqueNm", "ParticlePerNmSecond", "FieldReferenceDiameter", "FieldParticleRate" })
                 {
                     string raw = matches[0].GetValue(name);
                     if (raw == null)
@@ -1221,6 +1429,7 @@ namespace GNSystems
             State.TankCapacity = p != null ? p.maxAmount : 0;
             var td = part.Resources.Get("TopologicalDefects");
             State.TDQuantity = td != null ? td.amount : 0;
+            State.TDCapacity = td != null ? td.maxAmount : 0;
         }
         internal void Publish(VesselSettings settings, StepResult result, double dt)
         {
@@ -1229,6 +1438,8 @@ namespace GNSystems
             hoverOn = State.Hover;
             taOn = State.TA;
             generationOn = State.Generate;
+            blanketOn = State.Blanket;
+            blanketStarved = State.BlanketStarved;
             joined = State.Joined;
             group = State.Group;
             repose = State.Repose;
@@ -1240,6 +1451,7 @@ namespace GNSystems
             fieldOn = settings.Field;
             accelerationG = PublishedAcceleration = (float)settings.AccelerationG;
             rotationShare = PublishedRotation = (float)settings.RotationShare;
+            ecMargin = PublishedECMargin = (float)settings.ECMargin;
             if (result != null)
             {
                 if (result.FieldStatus != null) fieldStatus = result.FieldStatus;
@@ -1247,12 +1459,20 @@ namespace GNSystems
                 else if (!fieldStatus.StartsWith("OFF:")) fieldStatus = "OFF";
                 effectiveAccelerationG = result.Effects.EffectiveAccelerationG;
                 generationRate = State.Generated / dt;
+                blanketECRate = State.BlanketECGenerated / dt;
+                baryonRate = State.BaryonMassKg / dt;
+                if (!State.Blanket) blanketStatus = "Unavailable";
+                else if (State.TDFraction <= 0) blanketStatus = "Standby: no TopologicalDefects";
+                else if (State.BlanketStarved) blanketStatus = "Baryon supply limited";
+                else blanketStatus = "Automatic: " + (State.TDFraction * 100).ToString("F0", CultureInfo.InvariantCulture) + "% TD";
                 consumptionRate = result.Consumed / dt;
                 syncFactor = State.Sync;
                 var slider = Fields["accelerationG"].uiControlFlight as UI_FloatRange;
                 if (slider != null)
-                    slider.maxValue = (float)result.Effects.MaxG;
+                    slider.maxValue = (float)result.Effects.ConfigurationMaxG;
                 status = depleted ? "Depleted: fill own tank, then ON" : repose ? "Repose" : result.TAForcedOff ? "Trans-AM supply stop" : result.SupplyLimited ? "Supply limited" : engineOn ? "Running" : "Standby";
+                if (GNMultiDriveUnit.Unsynchronized(State))
+                    status = status == "Running" ? "Unsynchronized" : status + " / Unsynchronized";
             }
         }
         public override void OnSave(ConfigNode node)
@@ -1264,6 +1484,8 @@ namespace GNSystems
                 hoverOn = State.Hover;
                 taOn = State.TA;
                 generationOn = State.Generate;
+                blanketOn = State.Blanket;
+                blanketStarved = State.BlanketStarved;
                 joined = State.Joined;
                 group = State.Group;
                 repose = State.Repose;
@@ -1277,6 +1499,33 @@ namespace GNSystems
             base.OnUpdate();
             if (Visuals != null && HighLogic.LoadedSceneIsFlight)
                 Visuals.Update();
+        }
+        void ConfigureStateToggles()
+        {
+            BindStateToggle("engineOn", "ToggleEngine", CommandKind.Engine);
+            BindStateToggle("agOn", "ToggleAG", CommandKind.AG);
+            BindStateToggle("hoverOn", "ToggleHover", CommandKind.Hover);
+            BindStateToggle("taOn", "ToggleTA", CommandKind.TransAM);
+            BindStateToggle("generationOn", "ToggleGeneration", CommandKind.Generation);
+            BindStateToggle("joined", "ToggleJoin", CommandKind.Join);
+            BindStateToggle("repose", "ToggleRepose", CommandKind.Repose);
+            BindStateToggle("safeGuard", "ToggleSafeGuard", CommandKind.SafeGuard);
+            BindStateToggle("fieldOn", "ToggleField", CommandKind.Field);
+        }
+        void BindStateToggle(string fieldName, string eventName, CommandKind kind)
+        {
+            // Keep event methods for action groups and old craft, but show only the stateful control.
+            Events[eventName].guiActive = false;
+            var field = Fields[fieldName];
+            var toggle = field.uiControlFlight as UI_Toggle;
+            if (toggle == null) return;
+            toggle.onFieldChanged = (changed, previous) =>
+            {
+                bool requested = (bool)changed.GetValue(this);
+                // UI edits are requests; the coordinator publishes the accepted state.
+                changed.SetValue(previous, this);
+                Send(kind, requested);
+            };
         }
         void Send(CommandKind kind, bool value)
         {
@@ -1314,6 +1563,11 @@ namespace GNSystems
         public void ToggleGeneration()
         {
             Send(CommandKind.Generation, !generationOn);
+        }
+        [KSPEvent(guiActive = false, guiActiveEditor = false, guiName = "Toggle TD Blanket")]
+        public void ToggleBlanket()
+        {
+            ToggleGeneration();
         }
         [KSPEvent(guiActive = true, guiName = "Toggle Synchronization")]
         public void ToggleJoin()
@@ -1357,6 +1611,11 @@ namespace GNSystems
         }
         [KSPAction("Toggle GN Generation")]
         public void GenerationAction(KSPActionParam p)
+        {
+            ToggleGeneration();
+        }
+        [KSPAction("Toggle TD Blanket")]
+        public void BlanketAction(KSPActionParam p)
         {
             ToggleGeneration();
         }
@@ -1465,7 +1724,8 @@ namespace GNSystems
                 {
                     double amount, capacity;
                     requestPart.GetConnectedResourceTotals(resourceId, flowMode, out amount, out capacity, false);
-                    return Math.Max(0, capacity - amount);
+                    // With pulling=false KSP returns receivable space, not stored amount.
+                    return Math.Max(0, amount);
                 }
                 return resources.Where(CanPut).Sum(r => Math.Max(0, r.maxAmount - r.amount));
             }
@@ -1509,6 +1769,72 @@ namespace GNSystems
         }
     }
 #if !GN_ADAPTER_TEST
+    internal sealed class KspBaryonPort : IBaryonPort
+    {
+        sealed class Source
+        {
+            public PartResourceDefinition Definition;
+            public double ECPerUnit;
+        }
+        readonly Part requestPart;
+        readonly Source[] sources;
+        double energyCredit;
+        public KspBaryonPort(Vessel vessel, IEnumerable<string> resourceNames)
+        {
+            requestPart = vessel == null ? null : vessel.rootPart;
+            if (requestPart == null) throw new InvalidOperationException("TD Blanket requires a vessel root Part");
+            var list = new List<Source>();
+            foreach (string name in resourceNames ?? Enumerable.Empty<string>())
+            {
+                var definition = PartResourceLibrary.Instance.GetDefinition(name);
+                if (definition == null)
+                {
+                    Debug.LogWarning("[GN V3] TD Blanket resource is not defined: " + name);
+                    continue;
+                }
+                if (!Numbers.Finite(definition.density) || definition.density <= 0)
+                {
+                    Debug.LogWarning("[GN V3] TD Blanket resource has no positive mass: " + name);
+                    continue;
+                }
+                list.Add(new Source { Definition = definition, ECPerUnit = MassEnergy.ECPerResourceUnit(definition.density) });
+            }
+            sources = list.ToArray();
+        }
+        static double MeasurableQuantum(double amount)
+        {
+            if (amount <= 0) return 0;
+            long bits = BitConverter.DoubleToInt64Bits(amount);
+            double previous = BitConverter.Int64BitsToDouble(bits - 1);
+            return Math.Max(1e-18, 2 * (amount - previous));
+        }
+        public double TakeEnergy(double requestedEC)
+        {
+            Numbers.Nonnegative(requestedEC, "requestedEC");
+            double needed = Math.Max(0, requestedEC - energyCredit);
+            foreach (var source in sources)
+            {
+                if (needed <= 0) break;
+                double amount, capacity;
+                requestPart.GetConnectedResourceTotals(source.Definition.id, source.Definition.resourceFlowMode, out amount, out capacity, true);
+                amount = Math.Max(0, amount);
+                if (amount <= 0) continue;
+                // Dense KSP resources can require less than one double ULP per tick.
+                // Prepay a tiny but representable quantum and retain unused energy.
+                double requestedUnits = Math.Min(amount, Math.Max(needed / source.ECPerUnit, MeasurableQuantum(amount)));
+                double acceptedUnits = requestPart.RequestResource(source.Definition.id, requestedUnits, source.Definition.resourceFlowMode);
+                if (!Numbers.Finite(acceptedUnits) || acceptedUnits < 0)
+                    throw new InvalidOperationException("Invalid TD Blanket resource receipt: " + source.Definition.name);
+                acceptedUnits = Math.Min(requestedUnits, acceptedUnits);
+                energyCredit += acceptedUnits * source.ECPerUnit;
+                needed = Math.Max(0, requestedEC - energyCredit);
+            }
+            double supplied = Math.Min(requestedEC, energyCredit);
+            energyCredit -= supplied;
+            return supplied;
+        }
+    }
+
     public class GNDriveV3Vessel : VesselModule
     {
         readonly VesselSimulation simulation = new VesselSimulation();
@@ -1520,6 +1846,7 @@ namespace GNSystems
         readonly Dictionary<string, Vessel> targets = new Dictionary<string, Vessel>();
         VesselSettings settings = new VesselSettings();
         KspResourcePort particles, ec;
+        KspBaryonPort baryons;
         bool dirty = true, failed;
         double nextBoundsTime, lastTick = double.NaN;
         public double Radius { get; private set; } = 2;
@@ -1530,6 +1857,7 @@ namespace GNSystems
         GNShieldV3Visuals fieldVisuals; bool fieldVisible; GNAeroVisualSuppression aeroVisuals;
         GNVesselRedGlow vesselGlow;
         float vesselGlowTarget;
+        Vector3 afterimageAcceleration;
         float vesselGlowTransparency = 0.8f;
         struct AeroState
         {
@@ -1617,8 +1945,10 @@ namespace GNSystems
                 settings.Field = leader.fieldOn;
                 settings.AccelerationG = leader.accelerationG;
                 settings.RotationShare = leader.rotationShare;
+                settings.ECMargin = leader.ecMargin;
                 particles = new KspResourcePort(vessel, "GNparticle");
                 ec = new KspResourcePort(vessel, "ElectricCharge");
+                baryons = new KspBaryonPort(vessel, GNTDBlanketSettings.Current.ResourceNames);
             }
             var seen = new HashSet<Rigidbody>();
             foreach (var part in vessel.parts)
@@ -1647,6 +1977,8 @@ namespace GNSystems
                 // First changed control in stable-ID order wins a simultaneous conflicting edit.
                 var accel = modules.FirstOrDefault(m => m.accelerationG != m.PublishedAcceleration);
                 var rotation = modules.FirstOrDefault(m => m.rotationShare != m.PublishedRotation);
+                var margin = modules.FirstOrDefault(m => m.ecMargin != m.PublishedECMargin);
+                if (margin != null) settings.ECMargin = Numbers.Clamp(margin.ecMargin, 0, 1);
                 if (accel != null)
                     settings.AccelerationG = accel.accelerationG;
                 if (rotation != null)
@@ -1662,9 +1994,11 @@ namespace GNSystems
                         commandMessage = reason;
                 }
                 pending.Clear();
-                settings.AccelerationG = Numbers.Clamp(settings.AccelerationG, 0, states.Where(d => d.Running).Sum(d => d.Definition.MaxGContribution));
                 var input = ReadInput();
-                var result = simulation.Step(states, settings, input, particles, ec);
+                var result = simulation.Step(states, settings, input, particles, ec, baryons);
+                // Clamp to installed propulsion capability, not currently running capability.
+                // Engine shutdown and depletion therefore do not erase the preset.
+                settings.AccelerationG = Numbers.Clamp(settings.AccelerationG, 0, result.Effects.ConfigurationMaxG);
                 LastResult = result;
                 if (input.Active && !input.Packed)
                     ApplyEffects(input, result);
@@ -1674,7 +2008,6 @@ namespace GNSystems
                     SetFieldVisible(false);
                 }
                 Vec sharedRgb = DriveColorPolicy.SharedNormal(states);
-                Color shared = new Color((float)sharedRgb.X, (float)sharedRgb.Y, (float)sharedRgb.Z);
                 double visualPower = states.Where(d => d.Running).Sum(GNPropulsionUnit.Power);
                 double visualLoad = VisualPolicy.Load(input, result.Effects, visualPower);
                 double usedPower = result.Effects.SupportKN.Length + result.Effects.BrakeKN.Length + result.Effects.ThrustKN.Length + result.Effects.TorqueRate + result.Effects.FieldRepulsionRate;
@@ -1684,6 +2017,8 @@ namespace GNSystems
                 bool glowActive = glowSettings.Enabled && modules.Any(m => m.State != null && m.State.Running && m.State.TA && m.State.Definition.TransAM);
                 vesselGlowTarget = glowActive ? glowSettings.Intensity : 0;
                 vesselGlowTransparency = glowSettings.Transparency;
+                afterimageAcceleration = input.Active && !input.Packed && input.MassKg > 0 && result.ForceN.Length > 0
+                    ? ToUnity(result.ForceN / input.MassKg + input.Gravity) : Vector3.zero;
                 if (vesselGlowTarget > 0 && vesselGlow == null)
                     vesselGlow = new GNVesselRedGlow(vessel, glowSettings.ShellScale, glowSettings.ResponseSpeed, glowSettings.TransAMColor, glowSettings.ExcludedObjectKeywords);
                 foreach (var m in modules)
@@ -1691,13 +2026,14 @@ namespace GNSystems
                     m.Publish(settings, result, input.Dt);
                     if (commandMessage != null)
                         m.status = commandMessage;
-                    Color color = m.State.Definition.Generation ? (m.State.Original ? new Color(0, 1, 0.65f) : new Color(1, 0, 0.15f)) : shared;
-                    if (vesselTransAMColor)
-                        color = glowSettings.TransAMColor;
+                    Vec zeroTDColor = new Vec(m.GeneratorTint.r, m.GeneratorTint.g, m.GeneratorTint.b);
+                    Vec normalRgb = DriveColorPolicy.NormalFor(m.State, sharedRgb, zeroTDColor);
+                    Color color = new Color((float)normalRgb.X, (float)normalRgb.Y, (float)normalRgb.Z);
                     if (m.Visuals != null)
                     {
+                        bool blanketGenerating = m.State.Blanket && m.State.BlanketECGenerated > 0;
                         Vec backflow = ParticleVisualPolicy.BackflowAcceleration(result.ForceN, m.State.Running ? Mathf.Clamp(m.ParticleAcceleration, 0, 200) : 0);
-                        m.Visuals.SetState(color, (m.State.Running || m.State.Generated > 0 || GNTopologicalDefectsUnit.Rate(m.State) > 0), VisualPolicy.Open(m.State.Running, settings.SafeGuard), (float)VisualPolicy.Rotor(m.State.Running, GNTopologicalDefectsUnit.Rate(m.State) > 0, visualLoad), (float)VisualPolicy.Core(m.State.Running, settings.SafeGuard, visualLoad), m.State.Running ? (float)particleLoad : 0, ToUnity(backflow), vesselTransAMColor);
+                        m.Visuals.SetState(color, (m.State.Running || m.State.Generated > 0), VisualPolicy.Open(m.State.Running, settings.SafeGuard), (float)VisualPolicy.Rotor(m.State.Running, blanketGenerating, visualLoad), (float)VisualPolicy.Core(m.State.Running, settings.SafeGuard, visualLoad), m.State.Running ? (float)particleLoad : 0, ToUnity(backflow), vesselTransAMColor);
                     }
                 }
             }
@@ -1775,7 +2111,7 @@ namespace GNSystems
                 radius = Math.Max(radius, (p.transform.position - (Vector3)vessel.CoM).magnitude);
                 foreach (var renderer in p.FindModelComponents<Renderer>())
                 {
-                    if (renderer == null || !renderer.enabled || renderer is ParticleSystemRenderer || renderer.name.StartsWith("GN V3 Shield", StringComparison.Ordinal))
+                    if (renderer == null || !renderer.enabled || renderer is ParticleSystemRenderer || renderer.name.StartsWith("GN V3 Shield", StringComparison.Ordinal) || renderer.name.StartsWith("GN V3 Vessel Glow", StringComparison.Ordinal) || !renderer.gameObject.activeInHierarchy)
                         continue;
                     var bounds = renderer.bounds;
                     radius = Math.Max(radius, (bounds.center - (Vector3)vessel.CoM).magnitude + bounds.extents.magnitude);
@@ -1878,13 +2214,13 @@ namespace GNSystems
                 bool showGlow = HighLogic.LoadedSceneIsFlight && vessel != null && vessel == FlightGlobals.ActiveVessel && !vessel.packed && !failed;
                 vesselGlow.SetTarget(showGlow ? vesselGlowTarget : 0, vesselGlowTransparency);
                 vesselGlow.Update(Time.deltaTime);
+                vesselGlow.UpdateAfterimages(Time.deltaTime, showGlow && vesselGlowTarget > 0, afterimageAcceleration, (float)(2 * Radius));
             }
             if (fieldVisuals == null || vessel == null) return;
             if (!HighLogic.LoadedSceneIsFlight || vessel != FlightGlobals.ActiveVessel || vessel.packed || failed)
             { fieldVisuals.Hide(); return; }
-            bool ta = modules.Any(m => m.State != null && m.State.Running && m.State.TA && m.State.Definition.TransAM);
             Vec sharedRgb = DriveColorPolicy.SharedNormal(modules.Select(m => m.State));
-            Color c = ta ? GNVesselGlowSettings.Current.TransAMColor : new Color((float)sharedRgb.X, (float)sharedRgb.Y, (float)sharedRgb.Z);
+            Color c = new Color((float)sharedRgb.X, (float)sharedRgb.Y, (float)sharedRgb.Z);
             fieldVisuals.Update((Vector3)vessel.CoM, (float)Radius, c, fieldVisible);
         }
         internal static Vec ToCore(Vector3d v)
@@ -1917,10 +2253,98 @@ namespace GNSystems
             if (aeroVisuals != null) { aeroVisuals.Restore(); Destroy(aeroVisuals); }
         }
     }
+    // Displaced current-pose silhouettes; never clone Part components or colliders.
+    internal sealed class GNAfterimageVisuals : IDisposable
+    {
+        sealed class Entry
+        {
+            public Renderer Source;
+            public Mesh Baked;
+            public GameObject[] Copies;
+        }
+        readonly List<Entry> entries = new List<Entry>();
+        readonly Material[] materials;
+        float accelerationTime;
+        Vector3 direction;
+        public GNAfterimageVisuals(Renderer[] sources, Material template)
+        {
+            materials = new Material[GNVesselGlowSettings.Current.AfterimageCount];
+            for (int i = 0; i < materials.Length; i++) materials[i] = new Material(template);
+            if (materials.Length == 0) return;
+            foreach (var source in sources)
+            {
+                if (source == null) continue;
+                var skin = source as SkinnedMeshRenderer;
+                var filter = source.GetComponent<MeshFilter>();
+                Mesh mesh = skin != null ? skin.sharedMesh : filter == null ? null : filter.sharedMesh;
+                if (mesh == null) continue;
+                var entry = new Entry { Source = source, Copies = new GameObject[materials.Length] };
+                if (skin != null) { entry.Baked = new Mesh(); mesh = entry.Baked; }
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    var go = new GameObject("GN V3 Vessel Glow Afterimage");
+                    go.SetActive(false);
+                    go.layer = source.gameObject.layer;
+                    go.transform.SetParent(source.transform, false);
+                    go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                    var renderer = go.AddComponent<MeshRenderer>();
+                    renderer.sharedMaterials = Enumerable.Repeat(materials[i], source.sharedMaterials.Length).ToArray();
+                    renderer.receiveShadows = false;
+                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    entry.Copies[i] = go;
+                }
+                entries.Add(entry);
+            }
+        }
+        public void Update(float dt, bool enabled, Vector3 acceleration, float vesselDiameter)
+        {
+            var settings = GNVesselGlowSettings.Current;
+            bool accelerating = enabled && settings.AfterimagesEnabled && acceleration.magnitude >= settings.AfterimageThreshold;
+            if (accelerating) direction = -acceleration.normalized;
+            accelerationTime = (float)AfterimagePolicy.Advance(accelerationTime, settings.AfterimageExtendTime, dt, accelerating);
+            float extension = (float)AfterimagePolicy.Extension(accelerationTime, settings.AfterimageExtendTime);
+            // Reverse the same curve on release, retaining direction as silhouettes catch up.
+            for (int i = 0; i < materials.Length; i++)
+            {
+                Color c = settings.TransAMColor;
+                c.a = settings.AfterimageOpacity * extension * (materials.Length - i) / materials.Length;
+                materials[i].SetColor("_TintColor", c);
+            }
+            foreach (var entry in entries)
+            {
+                bool visible = extension > 0.001f && entry.Source != null && entry.Source.enabled && entry.Source.gameObject.activeInHierarchy;
+                if (visible && entry.Baked != null) ((SkinnedMeshRenderer)entry.Source).BakeMesh(entry.Baked);
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    var go = entry.Copies[i];
+                    if (go == null) continue;
+                    go.SetActive(visible);
+                    if (!visible) continue;
+                    // Field diameter excludes all generated effects, preventing recursive size growth.
+                    go.transform.position = entry.Source.transform.position + direction * extension * (float)AfterimagePolicy.Distance(vesselDiameter, settings.AfterimageSizeDivisor, settings.AfterimageSpacing, i);
+                }
+            }
+        }
+        public void Hide()
+        {
+            accelerationTime = 0;
+            foreach (var e in entries) foreach (var go in e.Copies) if (go != null) go.SetActive(false);
+        }
+        public void Dispose()
+        {
+            Hide();
+            foreach (var e in entries)
+            {
+                foreach (var go in e.Copies) if (go != null) UnityEngine.Object.Destroy(go);
+                if (e.Baked != null) UnityEngine.Object.Destroy(e.Baked);
+            }
+            entries.Clear();
+            foreach (var m in materials) if (m != null) UnityEngine.Object.Destroy(m);
+        }
+    }
     internal sealed class GNVesselRedGlow : IDisposable
     {
         readonly Vessel vessel;
-        readonly MaterialPropertyBlock working = new MaterialPropertyBlock();
         readonly List<GameObject> shells = new List<GameObject>();
         readonly List<GlowSlot> slots = new List<GlowSlot>();
         Renderer[] renderers = new Renderer[0];
@@ -1930,16 +2354,12 @@ namespace GNSystems
         readonly Color transAMColor;
         readonly string[] excludedObjectKeywords;
         float target, level, transparency = 0.8f;
-        bool applied;
-        static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
-        static readonly int EmissiveColor = Shader.PropertyToID("_EmissiveColor");
-        static readonly int SurfaceColor = Shader.PropertyToID("_Color");
-        static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
+        bool warnedMissingShells;
+        GNAfterimageVisuals afterimages;
         sealed class GlowSlot
         {
             public Renderer Renderer;
             public int MaterialIndex;
-            public MaterialPropertyBlock Original;
         }
 
         public GNVesselRedGlow(Vessel owner, float configuredShellScale, float configuredResponseSpeed, Color configuredColor, string[] configuredExcludedObjectKeywords)
@@ -1954,8 +2374,10 @@ namespace GNSystems
         public void Rebuild()
         {
             Restore();
+            if (afterimages != null) { afterimages.Dispose(); afterimages = null; }
             DestroyShells();
             slots.Clear();
+            warnedMissingShells = false;
             var candidates = vessel == null || vessel.parts == null
                 ? new Renderer[0]
                 : vessel.parts.SelectMany(p => p == null ? Enumerable.Empty<Renderer>() : p.FindModelComponents<Renderer>().AsEnumerable())
@@ -1969,6 +2391,12 @@ namespace GNSystems
             }
             renderers = slots.Select(s => s.Renderer).Distinct().ToArray();
             BuildShells();
+            if (shellMaterial != null && GNVesselGlowSettings.Current.AfterimagesEnabled)
+                afterimages = new GNAfterimageVisuals(renderers, shellMaterial);
+        }
+        public void UpdateAfterimages(float dt, bool enabled, Vector3 acceleration, float vesselDiameter)
+        {
+            if (afterimages != null) afterimages.Update(dt, enabled, acceleration, vesselDiameter);
         }
         bool IsExcludedObject(Renderer renderer)
         {
@@ -2000,21 +2428,24 @@ namespace GNSystems
         }
         void BuildShells()
         {
-            Shader shader = Shader.Find("Legacy Shaders/Particles/Additive") ?? Shader.Find("Particles/Additive");
-            if (shader == null)
+            if (shellMaterial == null)
             {
-                Debug.LogWarning("[GN V3] Additive vessel glow shader unavailable; surface tint only.");
-                return;
+                Shader shader = Shader.Find("Legacy Shaders/Particles/Additive") ?? Shader.Find("Particles/Additive");
+                if (shader == null)
+                {
+                    Debug.LogWarning("[GN V3] Additive vessel glow shader unavailable; vessel glow disabled.");
+                    return;
+                }
+                shellTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+                shellTexture.SetPixel(0, 0, Color.white);
+                shellTexture.Apply(false, true);
+                shellMaterial = new Material(shader);
+                shellMaterial.mainTexture = shellTexture;
+                shellMaterial.SetColor("_TintColor", new Color(1, 0, 0, 0));
+                noGlowMaterial = new Material(shader);
+                noGlowMaterial.mainTexture = shellTexture;
+                noGlowMaterial.SetColor("_TintColor", new Color(0, 0, 0, 0));
             }
-            shellTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-            shellTexture.SetPixel(0, 0, Color.white);
-            shellTexture.Apply(false, true);
-            shellMaterial = new Material(shader);
-            shellMaterial.mainTexture = shellTexture;
-            shellMaterial.SetColor("_TintColor", new Color(1, 0, 0, 0));
-            noGlowMaterial = new Material(shader);
-            noGlowMaterial.mainTexture = shellTexture;
-            noGlowMaterial.SetColor("_TintColor", new Color(0, 0, 0, 0));
             foreach (var source in renderers)
             {
                 if (source == null)
@@ -2087,49 +2518,34 @@ namespace GNSystems
                 Restore();
                 return;
             }
-            if (!applied)
-            {
-                foreach (var slot in slots)
-                    if (slot.Renderer != null)
-                    {
-                        var original = new MaterialPropertyBlock();
-                        slot.Renderer.GetPropertyBlock(original, slot.MaterialIndex);
-                        slot.Original = original;
-                    }
-                applied = true;
-            }
-            Color glow = new Color(transAMColor.r * level, transAMColor.g * level, transAMColor.b * level, 1);
-            Color surface = Color.Lerp(Color.white, transAMColor, Mathf.Clamp01(level));
             if (shellMaterial != null)
-                shellMaterial.SetColor("_TintColor", new Color(transAMColor.r, transAMColor.g, transAMColor.b, Mathf.Clamp01(level) * (1 - transparency)));
+            {
+                // Additive output is RGB * alpha. This piecewise form keeps the
+                // configured intensity linear without dimming both channels below 1.
+                float rgbIntensity = Mathf.Max(1, level);
+                float alpha = Mathf.Clamp01(level) * (1 - transparency);
+                shellMaterial.SetColor("_TintColor", new Color(transAMColor.r * rgbIntensity, transAMColor.g * rgbIntensity, transAMColor.b * rgbIntensity, alpha));
+            }
+            int activeShells = 0;
             foreach (var shell in shells)
-                if (shell != null && !shell.activeSelf)
-                    shell.SetActive(true);
-            foreach (var slot in slots)
-                if (slot.Renderer != null && slot.Renderer.enabled)
+                if (shell != null)
                 {
-                    slot.Renderer.GetPropertyBlock(working, slot.MaterialIndex);
-                    working.SetColor(EmissionColor, glow);
-                    working.SetColor(EmissiveColor, glow);
-                    // Most KSP part shaders use _Color; _BaseColor covers newer replacements.
-                    // The texture remains visible because this is a multiplicative red tint.
-                    working.SetColor(SurfaceColor, surface);
-                    working.SetColor(BaseColor, surface);
-                    slot.Renderer.SetPropertyBlock(working, slot.MaterialIndex);
-                    working.Clear();
+                    if (!shell.activeSelf)
+                        shell.SetActive(true);
+                    if (shell.activeInHierarchy)
+                        activeShells++;
                 }
+            if (activeShells == 0 && !warnedMissingShells)
+            {
+                warnedMissingShells = true;
+                Debug.LogWarning("[GN V3] Vessel glow requested but no active glow shells are available; renderers=" + renderers.Length + " shells=" + shells.Count + " level=" + level);
+            }
+            else if (activeShells > 0)
+                warnedMissingShells = false;
         }
         public void Restore()
         {
-            if (!applied)
-                return;
-            foreach (var slot in slots)
-                if (slot.Renderer != null && slot.Original != null)
-                {
-                    slot.Renderer.SetPropertyBlock(slot.Original, slot.MaterialIndex);
-                    slot.Original = null;
-                }
-            applied = false;
+            if (afterimages != null) afterimages.Hide();
             foreach (var shell in shells)
                 if (shell != null)
                     shell.SetActive(false);
@@ -2137,6 +2553,7 @@ namespace GNSystems
         public void Dispose()
         {
             Restore();
+            if (afterimages != null) { afterimages.Dispose(); afterimages = null; }
             DestroyShells();
             if (shellMaterial != null) UnityEngine.Object.Destroy(shellMaterial);
             if (noGlowMaterial != null) UnityEngine.Object.Destroy(noGlowMaterial);
@@ -2358,10 +2775,11 @@ namespace GNSystems
         readonly Renderer[] renderers, condenserRenderers;
         readonly Light[] lights;
         readonly LightState[] lightStates;
-        readonly ParticleSystem[] particles;
+        readonly ParticleSystem[] particles, particleGlows;
         readonly KSPParticleEmitter[] legacy;
         Material particleMaterial; Texture2D particleTexture;
         readonly GNParticleTint particleTint = new GNParticleTint(0.08f, 0.8f);
+        readonly GNParticleTint particleGlowTint = new GNParticleTint(0.2f, 1f);
         readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
         AudioSource audio;
         Color color = Color.green, targetColor = Color.green;
@@ -2402,6 +2820,7 @@ namespace GNSystems
             foreach (var p in particleRoots.SelectMany(t => t.GetComponentsInChildren<ParticleSystem>(true)).Distinct())
                 if (p.GetComponentInParent<Part>() == module.part) p.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
             particles = particleRoots.Where(t => t.GetComponentInParent<Part>() == module.part).Select(CreateParticles).ToArray();
+            particleGlows = particleRoots.Where(t => t.GetComponentInParent<Part>() == module.part).Select(CreateParticleGlow).ToArray();
             Debug.Log("[GN V3] Particle anchors for " + module.part.name + ": " + module.ParticleTransform + " count=" + particles.Length);
             if (!string.IsNullOrEmpty(module.AudioPath))
             {
@@ -2476,6 +2895,43 @@ namespace GNSystems
             return ps;
         }
 
+        ParticleSystem CreateParticleGlow(Transform anchor)
+        {
+            var go = new GameObject("GN V3 ring glow");
+            go.SetActive(false);
+            go.transform.SetParent(anchor, false);
+            // The circle is perpendicular to the same -Y exhaust axis as the plume.
+            go.transform.localRotation = Quaternion.FromToRotation(Vector3.forward, Vector3.down);
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.playOnAwake = false;
+            main.loop = true;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+            main.maxParticles = 256;
+            main.startLifetime = 0.4f;
+            main.startSpeed = 0.02f;
+            float size = Mathf.Clamp(owner.ParticleGlowSize, 0.01f, 2f);
+            main.startSize = new ParticleSystem.MinMaxCurve(size * 0.7f, size * 1.3f);
+            var shape = ps.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Circle;
+            shape.radius = Mathf.Clamp(owner.ParticleRadius, 0, 2);
+            var emission = ps.emission;
+            emission.rateOverTime = Mathf.Clamp(owner.ParticleGlowRate, 0, 1000);
+            emission.enabled = false;
+            var noise = ps.noise;
+            noise.enabled = true;
+            noise.strength = size * 0.08f;
+            noise.frequency = 2f;
+            noise.scrollSpeed = 0.2f;
+            var renderer = ps.GetComponent<ParticleSystemRenderer>();
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.sharedMaterial = particleMaterial;
+            renderer.enabled = particleMaterial != null;
+            go.SetActive(true);
+            return ps;
+        }
+
 public void ApplyParticleSettings(ParticleSystem p, float size, float rate, float speed, float lifetime, float angle, float radius)
 {
     float cSize = Mathf.Clamp(size, 0.001f, 1f);
@@ -2497,6 +2953,19 @@ public void ApplyParticleSettings(ParticleSystem p, float size, float rate, floa
     var emission = p.emission;
     emission.rateOverTime = cRate;
 }
+
+        void ApplyParticleGlowSettings(ParticleSystem p, float load)
+        {
+            float size = Mathf.Clamp(owner.ParticleGlowSize, 0.01f, 2f);
+            float density = Mathf.Clamp(owner.ParticleGlowRate, 0, 1000) * Mathf.Lerp(0.2f, 1f, load);
+            var main = p.main;
+            main.startSize = new ParticleSystem.MinMaxCurve(size * 0.7f, size * 1.3f);
+            main.startColor = new Color(1, 1, 1, Mathf.Clamp01(owner.ParticleGlowIntensity * Mathf.Lerp(0.25f, 1f, load)));
+            var shape = p.shape;
+            shape.radius = Mathf.Clamp(owner.ParticleRadius, 0, 2);
+            var emission = p.emission;
+            emission.rateOverTime = density;
+        }
 
         void ApplyParticleAcceleration(ParticleSystem p)
         {
@@ -2587,7 +3056,7 @@ public void ApplyParticleSettings(ParticleSystem p, float size, float rate, floa
                     float normalLevel = active ? level : 0;
                     float desiredIntensity = visualSettings.GNLightEnabled ? Mathf.Lerp(visualSettings.GNLightIntensity * normalLevel, visualSettings.GNLightTransAMIntensity, transAMLevel) : 0;
                     float desiredRange = visualSettings.GNLightEnabled ? Mathf.Lerp(visualSettings.GNLightRange * normalLevel, visualSettings.GNLightTransAMRange, transAMLevel) : 0;
-                    Color desiredColor = Color.Lerp(color, visualSettings.TransAMCoreColor, transAMLevel);
+                    Color desiredColor = Color.Lerp(color, visualSettings.TransAMColor, transAMLevel);
                     l.intensity = Mathf.Lerp(l.intensity, desiredIntensity, blend);
                     l.range = Mathf.Lerp(l.range, desiredRange, blend);
                     l.color = Color.Lerp(l.color, desiredColor, blend);
@@ -2606,6 +3075,18 @@ public void ApplyParticleSettings(ParticleSystem p, float size, float rate, floa
                     if (active && !p.isPlaying)
                         p.Play(false);
                     if (!active && p.isPlaying)
+                        p.Stop(false, ParticleSystemStopBehavior.StopEmitting);
+                }
+            foreach (var p in particleGlows)
+                if (p != null)
+                {
+                    ApplyParticleGlowSettings(p, particleLevel);
+                    particleGlowTint.Apply(p, color);
+                    var emission = p.emission;
+                    emission.enabled = active && owner.ParticleGlowIntensity > 0 && owner.ParticleGlowRate > 0;
+                    if (emission.enabled && !p.isPlaying)
+                        p.Play(false);
+                    if (!emission.enabled && p.isPlaying)
                         p.Stop(false, ParticleSystemStopBehavior.StopEmitting);
                 }
             foreach (var p in legacy)
@@ -2636,6 +3117,7 @@ public void ApplyParticleSettings(ParticleSystem p, float size, float rate, floa
                 light.range = lightStates[i].Range;
             }
             foreach (var p in particles) if (p != null) UnityEngine.Object.Destroy(p.gameObject);
+            foreach (var p in particleGlows) if (p != null) UnityEngine.Object.Destroy(p.gameObject);
             if (particleMaterial != null) UnityEngine.Object.Destroy(particleMaterial);
             if (particleTexture != null) UnityEngine.Object.Destroy(particleTexture);
             if (audio != null)

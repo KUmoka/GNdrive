@@ -1,0 +1,329 @@
+System.Void Part::GetConnectedResourceTotals(System.Int32,System.Double&,System.Double&,System.Boolean)
+resourceID
+amount
+maxAmount
+pulling
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: call PartResourceLibrary PartResourceLibrary::get_Instance()
+IL_0007: dup
+IL_0008: pop
+IL_0009: ldarg.1
+IL_000a: callvirt PartResourceDefinition PartResourceLibrary::GetDefinition(System.Int32)
+IL_000f: dup
+IL_0010: pop
+IL_0011: callvirt ResourceFlowMode PartResourceDefinition::get_resourceFlowMode()
+IL_0016: dup
+IL_0017: pop
+IL_0018: ldarg.2
+IL_0019: ldarg.3
+IL_001a: ldarg.s pulling
+IL_001c: callvirt System.Void Part::GetConnectedResourceTotals(System.Int32,ResourceFlowMode,System.Double&,System.Double&,System.Boolean)
+IL_0021: ret
+System.Void Part::GetConnectedResourceTotals(System.Int32,ResourceFlowMode,System.Double&,System.Double&,System.Boolean)
+resourceID
+flowMode
+amount
+maxAmount
+pulling
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldc.i4.0
+IL_0004: ldarg.3
+IL_0005: ldarg.s maxAmount
+IL_0007: ldarg.s pulling
+IL_0009: call System.Void Part::GetConnectedResourceTotals(System.Int32,ResourceFlowMode,System.Boolean,System.Double&,System.Double&,System.Boolean)
+IL_000e: ret
+System.Void Part::GetConnectedResourceTotals(System.Int32,ResourceFlowMode,System.Boolean,System.Double&,System.Double&,System.Boolean)
+resourceID
+flowMode
+simulate
+amount
+maxAmount
+pulling
+IL_0000: ldarg.2
+IL_0001: switch IL_00ec,IL_0069,IL_0069,IL_002b,IL_0069,IL_0069,IL_002b,IL_002b
+IL_0026: br IL_00ec
+IL_002b: ldarg.3
+IL_002c: brfalse.s IL_0055
+IL_002e: ldc.i4.5
+IL_002f: switch IL_002e
+IL_0038: ldc.i4.1
+IL_0039: brtrue.s IL_0041
+IL_003b: ldtoken System.Void Part::GetConnectedResourceTotals(System.Int32,ResourceFlowMode,System.Boolean,System.Double&,System.Double&,System.Boolean)
+IL_0040: pop
+IL_0041: ldarg.0
+IL_0042: ldfld PartSet Part::simulationCrossfeedPartSet
+IL_0047: ldarg.1
+IL_0048: ldarg.s amount
+IL_004a: ldarg.s maxAmount
+IL_004c: ldarg.s pulling
+IL_004e: ldarg.3
+IL_004f: callvirt System.Void PartSet::GetConnectedResourceTotals(System.Int32,System.Double&,System.Double&,System.Boolean,System.Boolean)
+IL_0054: ret
+IL_0055: ldarg.0
+IL_0056: ldfld PartSet Part::crossfeedPartSet
+IL_005b: ldarg.1
+IL_005c: ldarg.s amount
+IL_005e: ldarg.s maxAmount
+IL_0060: ldarg.s pulling
+IL_0062: ldarg.3
+IL_0063: callvirt System.Void PartSet::GetConnectedResourceTotals(System.Int32,System.Double&,System.Double&,System.Boolean,System.Boolean)
+IL_0068: ret
+IL_0069: ldarg.0
+IL_006a: ldfld ShipConstruct Part::ship
+IL_006f: ldnull
+IL_0070: cgt.un
+IL_0072: ldarg.3
+IL_0073: and
+IL_0074: brfalse.s IL_00a5
+IL_0076: ldc.i4.1
+IL_0077: switch IL_0076
+IL_0080: ldsfld System.Boolean HighLogic::LoadedSceneIsEditor
+IL_0085: brfalse.s IL_00a5
+IL_0087: ldc.i4.2
+IL_0088: switch IL_0087
+IL_0091: ldarg.0
+IL_0092: ldfld ShipConstruct Part::ship
+IL_0097: ldarg.1
+IL_0098: ldc.i4.1
+IL_0099: ldarg.s amount
+IL_009b: ldarg.s maxAmount
+IL_009d: ldarg.s pulling
+IL_009f: callvirt System.Void ShipConstruct::GetConnectedResourceTotals(System.Int32,System.Boolean,System.Double&,System.Double&,System.Boolean)
+IL_00a4: ret
+IL_00a5: ldarg.0
+IL_00a6: ldfld Vessel Part::vessel
+IL_00ab: ldnull
+IL_00ac: call System.Boolean UnityEngine.Object::op_Inequality(UnityEngine.Object,UnityEngine.Object)
+IL_00b1: dup
+IL_00b2: pop
+IL_00b3: brfalse.s IL_00d3
+IL_00b5: ldc.i4.5
+IL_00b6: switch IL_00b5
+IL_00bf: ldarg.0
+IL_00c0: ldfld Vessel Part::vessel
+IL_00c5: ldarg.1
+IL_00c6: ldarg.3
+IL_00c7: ldarg.s amount
+IL_00c9: ldarg.s maxAmount
+IL_00cb: ldarg.s pulling
+IL_00cd: callvirt System.Void Vessel::GetConnectedResourceTotals(System.Int32,System.Boolean,System.Double&,System.Double&,System.Boolean)
+IL_00d2: ret
+IL_00d3: ldarg.s amount
+IL_00d5: ldc.r8 0
+IL_00de: stind.r8
+IL_00df: ldarg.s maxAmount
+IL_00e1: ldc.r8 0
+IL_00ea: stind.r8
+IL_00eb: ret
+IL_00ec: ldarg.3
+IL_00ed: brfalse.s IL_010e
+IL_00ef: ldc.i4.1
+IL_00f0: switch IL_00ef
+IL_00f9: ldarg.0
+IL_00fa: call PartResourceList Part::get_SimulationResources()
+IL_00ff: dup
+IL_0100: pop
+IL_0101: ldarg.1
+IL_0102: ldarg.s amount
+IL_0104: ldarg.s maxAmount
+IL_0106: ldarg.s pulling
+IL_0108: callvirt System.Void PartResourceList::GetFlowingTotals(System.Int32,System.Double&,System.Double&,System.Boolean)
+IL_010d: ret
+IL_010e: ldarg.0
+IL_010f: call PartResourceList Part::get_Resources()
+IL_0114: dup
+IL_0115: pop
+IL_0116: ldarg.1
+IL_0117: ldarg.s amount
+IL_0119: ldarg.s maxAmount
+IL_011b: ldarg.s pulling
+IL_011d: callvirt System.Void PartResourceList::GetFlowingTotals(System.Int32,System.Double&,System.Double&,System.Boolean)
+IL_0122: ret
+System.Void Part::GetConnectedResourceTotals(System.Int32,System.Double&,System.Double&,System.Double,System.Boolean)
+resourceID
+amount
+maxAmount
+threshold
+pulling
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: call PartResourceLibrary PartResourceLibrary::get_Instance()
+IL_0007: dup
+IL_0008: pop
+IL_0009: ldarg.1
+IL_000a: callvirt PartResourceDefinition PartResourceLibrary::GetDefinition(System.Int32)
+IL_000f: dup
+IL_0010: pop
+IL_0011: callvirt ResourceFlowMode PartResourceDefinition::get_resourceFlowMode()
+IL_0016: dup
+IL_0017: pop
+IL_0018: ldarg.2
+IL_0019: ldarg.3
+IL_001a: ldarg.s threshold
+IL_001c: ldarg.s pulling
+IL_001e: callvirt System.Void Part::GetConnectedResourceTotals(System.Int32,ResourceFlowMode,System.Double&,System.Double&,System.Double,System.Boolean)
+IL_0023: ret
+System.Void Part::GetConnectedResourceTotals(System.Int32,ResourceFlowMode,System.Double&,System.Double&,System.Double,System.Boolean)
+resourceID
+flowMode
+amount
+maxAmount
+threshold
+pulling
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldc.i4.0
+IL_0004: ldarg.3
+IL_0005: ldarg.s maxAmount
+IL_0007: ldarg.s threshold
+IL_0009: ldarg.s pulling
+IL_000b: callvirt System.Void Part::GetConnectedResourceTotals(System.Int32,ResourceFlowMode,System.Boolean,System.Double&,System.Double&,System.Double,System.Boolean)
+IL_0010: ret
+System.Void Part::GetConnectedResourceTotals(System.Int32,ResourceFlowMode,System.Boolean,System.Double&,System.Double&,System.Double,System.Boolean)
+resourceID
+flowMode
+simulate
+amount
+maxAmount
+threshold
+pulling
+IL_0000: ldarg.2
+IL_0001: switch IL_007e,IL_0068,IL_0068,IL_0028,IL_0068,IL_0068,IL_0028,IL_0028
+IL_0026: br.s IL_007e
+IL_0028: ldarg.3
+IL_0029: brfalse.s IL_0053
+IL_002b: ldc.i4.4
+IL_002c: switch IL_002b
+IL_0035: ldc.i4.1
+IL_0036: brtrue.s IL_003e
+IL_0038: ldtoken System.Void Part::GetConnectedResourceTotals(System.Int32,ResourceFlowMode,System.Boolean,System.Double&,System.Double&,System.Double,System.Boolean)
+IL_003d: pop
+IL_003e: ldarg.0
+IL_003f: ldfld PartSet Part::simulationCrossfeedPartSet
+IL_0044: ldarg.1
+IL_0045: ldarg.s amount
+IL_0047: ldarg.s maxAmount
+IL_0049: ldarg.s threshold
+IL_004b: ldarg.s pulling
+IL_004d: callvirt System.Void PartSet::GetConnectedResourceTotals(System.Int32,System.Double&,System.Double&,System.Double,System.Boolean)
+IL_0052: ret
+IL_0053: ldarg.0
+IL_0054: ldfld PartSet Part::crossfeedPartSet
+IL_0059: ldarg.1
+IL_005a: ldarg.s amount
+IL_005c: ldarg.s maxAmount
+IL_005e: ldarg.s threshold
+IL_0060: ldarg.s pulling
+IL_0062: callvirt System.Void PartSet::GetConnectedResourceTotals(System.Int32,System.Double&,System.Double&,System.Double,System.Boolean)
+IL_0067: ret
+IL_0068: ldarg.0
+IL_0069: ldfld Vessel Part::vessel
+IL_006e: ldarg.1
+IL_006f: ldarg.3
+IL_0070: ldarg.s amount
+IL_0072: ldarg.s maxAmount
+IL_0074: ldarg.s threshold
+IL_0076: ldarg.s pulling
+IL_0078: callvirt System.Void Vessel::GetConnectedResourceTotals(System.Int32,System.Boolean,System.Double&,System.Double&,System.Double,System.Boolean)
+IL_007d: ret
+IL_007e: ldarg.3
+IL_007f: brfalse.s IL_00a1
+IL_0081: ldc.i4.3
+IL_0082: switch IL_0081
+IL_008b: ldarg.0
+IL_008c: call PartResourceList Part::get_SimulationResources()
+IL_0091: dup
+IL_0092: pop
+IL_0093: ldarg.1
+IL_0094: ldarg.s amount
+IL_0096: ldarg.s maxAmount
+IL_0098: ldarg.s pulling
+IL_009a: callvirt System.Void PartResourceList::GetFlowingTotals(System.Int32,System.Double&,System.Double&,System.Boolean)
+IL_009f: br.s IL_00b5
+IL_00a1: ldarg.0
+IL_00a2: call PartResourceList Part::get_Resources()
+IL_00a7: dup
+IL_00a8: pop
+IL_00a9: ldarg.1
+IL_00aa: ldarg.s amount
+IL_00ac: ldarg.s maxAmount
+IL_00ae: ldarg.s pulling
+IL_00b0: callvirt System.Void PartResourceList::GetFlowingTotals(System.Int32,System.Double&,System.Double&,System.Boolean)
+IL_00b5: ldarg.s pulling
+IL_00b7: brfalse.s IL_012e
+IL_00b9: ldc.i4.4
+IL_00ba: switch IL_00b9
+IL_00c3: ldarg.s maxAmount
+IL_00c5: ldind.r8
+IL_00c6: ldarg.s threshold
+IL_00c8: mul
+IL_00c9: stloc.0
+IL_00ca: ldarg.s amount
+IL_00cc: ldarg.s amount
+IL_00ce: ldind.r8
+IL_00cf: ldloc.0
+IL_00d0: sub
+IL_00d1: stind.r8
+IL_00d2: ldarg.s amount
+IL_00d4: ldind.r8
+IL_00d5: ldc.r8 1E-09
+IL_00de: bge.un.s IL_00f6
+IL_00e0: ldc.i4.7
+IL_00e1: switch IL_00e0
+IL_00ea: ldarg.s amount
+IL_00ec: ldc.r8 0
+IL_00f5: stind.r8
+IL_00f6: ldarg.s maxAmount
+IL_00f8: ldarg.s maxAmount
+IL_00fa: ldind.r8
+IL_00fb: ldc.r8 1
+IL_0104: ldarg.s threshold
+IL_0106: sub
+IL_0107: mul
+IL_0108: stind.r8
+IL_0109: ldarg.s maxAmount
+IL_010b: ldind.r8
+IL_010c: ldc.r8 1E-09
+IL_0115: bge.un.s IL_0189
+IL_0117: ldc.i4.6
+IL_0118: switch IL_0117
+IL_0121: ldarg.s maxAmount
+IL_0123: ldc.r8 0
+IL_012c: stind.r8
+IL_012d: ret
+IL_012e: ldarg.s maxAmount
+IL_0130: ldarg.s maxAmount
+IL_0132: ldind.r8
+IL_0133: ldarg.s threshold
+IL_0135: mul
+IL_0136: stind.r8
+IL_0137: ldarg.s amount
+IL_0139: ldarg.s maxAmount
+IL_013b: ldind.r8
+IL_013c: ldarg.s amount
+IL_013e: ldind.r8
+IL_013f: sub
+IL_0140: stind.r8
+IL_0141: ldarg.s amount
+IL_0143: ldind.r8
+IL_0144: ldc.r8 1E-09
+IL_014d: bge.un.s IL_0165
+IL_014f: ldc.i4.2
+IL_0150: switch IL_014f
+IL_0159: ldarg.s amount
+IL_015b: ldc.r8 0
+IL_0164: stind.r8
+IL_0165: ldarg.s maxAmount
+IL_0167: ldind.r8
+IL_0168: ldc.r8 1E-09
+IL_0171: bge.un.s IL_0189
+IL_0173: ldc.i4.4
+IL_0174: switch IL_0173
+IL_017d: ldarg.s maxAmount
+IL_017f: ldc.r8 0
+IL_0188: stind.r8
+IL_0189: ret

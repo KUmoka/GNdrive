@@ -1,0 +1,11 @@
+[
+  "parts\\GN_Condenser\\GNCondenser2500.cfg",
+  "parts\\GN_Condenser_Drive\\GNCondenserDrive1875.cfg",
+  "parts\\GN_Drive\\GNdrive1250.cfg",
+  "parts\\GN_Drive\\GNdrive1875.cfg",
+  "parts\\GN_Drive\\GNdrive2500.cfg",
+  "parts\\GN_Drive_Tau\\GNTauDrive2500.cfg",
+  "parts\\GN_Drive_Tau\\GNTauDrive3750.cfg",
+  "parts\\GN_Test\\GNDriveV3Test.cfg",
+  "parts\\GN_Thruster\\GNThruster1250.cfg"
+]

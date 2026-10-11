@@ -1,0 +1,144 @@
+
+  GNDriveV3.Core.Tests -> C:\Users\osaka\source\repos\KUmoka\GNdrive\tests\GNDriveV3\bin\Release\GNDriveV3.Core.Tests.exe
+PASS 01 Hover overrides AG
+PASS 02 Multiple AG no double support
+PASS 03 Hover falling increases support
+PASS 04 Hover ascending never pushes down
+PASS 05 Zero gravity no support
+PASS 06 Zero acceleration forbids support
+PASS 07 Mass acceleration cap
+PASS 08 Power cap
+PASS 09 Support first on shortage
+PASS 10 Downward thrust removed
+PASS 11 Brakes replace throttle and RCS translation
+PASS 12 Vertical brake merged into support
+PASS 13 Combined controls length limited
+PASS 14 RCS OFF translation and rotation ignored
+PASS 15 Torque not a translation
+PASS 16 Unused rotation share stays reserved
+PASS 17 Thrust torque equal shortage scale
+PASS 18 Translation charges resultant norm
+PASS 19 Power reservations are not vector norm
+PASS 20 Empty tank direct same-step generation
+PASS 21 Full tank simultaneous consumption generation
+PASS 22 Store actual accepted surplus
+PASS 23 EC partial supply scales generation
+PASS 24 EC recovery restarts generation
+PASS 25 TD alone supplies no particle EC
+PASS 26 TD amount does not alter ordinary EC generation
+PASS 27 Full TD produces no excess EC
+PASS 28 TD cannot operate as power-only generator
+PASS 29 SafeGuard never takes reserve
+PASS 30 SafeGuard zero generation no depletion or TA exit
+PASS 31 No positive local tank cannot run
+PASS 32 Depleted restart needs own full tank
+PASS 33 Partial supply does not latch engine off
+PASS 34 TA multiplies Power only
+PASS 35 TA fallback uses paid budget and refunds
+PASS 36 Any Gen1 prevents manual TA stop
+PASS 37 Gen1 refill TA lock
+PASS 38 Repose forbidden during TA
+PASS 39 Repose generates and leaves group
+PASS 40 Equal individuality n squared aggregate
+PASS 41 Mixed Original Tau sample variance
+PASS 42 Atomic sync and join rejects incomplete restart
+PASS 43 Generation OFF leaves TD Blanket automatic
+PASS 44 Field diameter squared cheapest maintenance
+PASS 45 Field opposite targets no fee cancellation
+PASS 46 Inactive and packed conversion only
+PASS 47 Actual take shortage scales before effects
+PASS 48 Input order independent and duplicate ID refused
+PASS 49 Time step split consistent at constant input
+PASS 50 Random resource conservation 2000 seeds
+PASS 51 TD alone creates no EC overflow
+PASS 52 Field shortage stops and requires manual ON
+PASS 53 Field only own capable Power contributes
+PASS 54 Field support consumes capable Power first
+PASS 55 Zero demand is not depletion
+PASS 56 Actual zero supply latches depletion
+PASS 57 Invalid dt rejected before charging
+PASS 58 Single invalid individuality rejected
+PASS 59 Hover deadband supports weight
+PASS 60 Off engine contributes no support or max G
+PASS 61 Duplicate actions same tick scope only once
+PASS 62 Overflow rejected before EC debit
+PASS 63 Engine OFF independent of Gen1 TA latch
+PASS 64 Ascending AG downward RCS exceeds natural braking
+PASS 65 Down RCS blocked stationary falling and Hover
+PASS 66 Field maintenance before thrust
+PASS 67 Repulsion scales without Field stopping
+PASS 68 Exact payment rounding preserves Field
+PASS 69 Support wins over Field maintenance
+PASS 70 Opposing RCS preserves support reservation and Field
+PASS 71 Generation OFF clears SafeGuard and uses stock
+PASS 72 Loaded generation OFF reconciles SafeGuard
+PASS 73 EC shortage does not disable SafeGuard
+PASS 74 Other enabled generator retains SafeGuard
+PASS 75 Hover AG mutually exclusive commands
+PASS 76 Saved Hover AG overlap reconciles
+PASS 77 Random opposing thrust allocator conservation
+PASS 78 Stock pitch yaw roll torque directions through simulation
+PASS 79 Combined rotation preserves stock axis signs and cap
+PASS 80 Support alone drives visual load
+PASS 81 RCS visual load honors switch and torque input
+PASS 82 TD alone does not cause idle rotation
+PASS 83 Clamp binary while core tracks load
+PASS 84 Only numeric mechanism suffixes match
+PASS 85 TA triples acceleration at normal cap without changing setting
+PASS 86 Off or unsupported TA cannot boost acceleration
+PASS 87 TA fallback restores normal acceleration same tick
+PASS 88 TA multiplier never stacks and zero stays zero
+PASS 89 Reported 31 tonne 10000 Power reaches 15G
+PASS 90 Brakes alone counter gravity at rest
+PASS 91 Braking descent converges to zero including tiny residual
+PASS 92 Brakes cannot hold when acceleration budget insufficient
+PASS 93 Shield rim transparent front opaque edge
+PASS 94 Shield fade and grazing angles stay bounded
+PASS 95 Colour transition finishes in 1.5 seconds
+PASS 96 Colour transition interruption starts from displayed colour
+PASS 97 Repeated target messages do not reset colour fade
+PASS 98 Particle load endpoints and inverse cone
+PASS 99 Particle lifetime budget preserves headroom
+PASS 100 Condenser fill clamps and handles missing capacity
+PASS 101 Stopped and full Tau generators retain inherited colour
+PASS 102 Particle backflow has constant opposite acceleration
+PASS 103 Particle backflow scales from idle to full load
+PASS 104 Random full allocator conserves particle budget
+PASS 105 Afterimage distances scale with vessel diameter
+PASS 106 Afterimage extension eases from zero and caps
+PASS 107 Afterimage release reverses extension and resumes without reset
+PASS 108 Individuality is deterministic bounded binary quantization
+PASS 109 Individuality has many values and intentional rare collisions
+PASS 110 Blanket colour is green for any positive TD
+PASS 111 Mass-energy units
+PASS 112 Half TD refills idle particle tank
+PASS 113 Full TD charges EC independently
+PASS 114 Zero TD furnace uses external EC
+PASS 115 Quarter TD partial supply
+PASS 116 Generation OFF does not stop charging
+PASS 117 Full stores consume no baryons
+PASS 118 Full EC supplies same-step furnace without cycling
+PASS 119 Baryon shortage uses EC and recovers automatically
+PASS 120 Blanket without furnace charges
+PASS 121 Legacy Blanket toggle cannot disable automatic source
+PASS 122 Packed long step stops at EC capacity without particle spill
+PASS 123 Multi-blanket shares EC receiving capacity
+PASS 124 Furnace caps generation at particle free space
+PASS 125 Random independent EC and particle conservation
+PASS 126 Reported 40 percent TD restarts with zero EC
+RESULT 126 passed, 0 failed
+
+  GNDriveV3.Adapter.Tests -> C:\Users\osaka\source\repos\KUmoka\GNdrive\tests\GNDriveV3\bin\Release\GNDriveV3.Adapter.Tests.exe
+PASS EC stage priority constructor accepted
+PASS EC totals use native mode and direction
+PASS Empty EC can recharge and full EC has no receiving space
+PASS EC take delegates once and returns actual amount
+PASS EC put uses negative demand and positive receipt
+PASS Full EC storage returns zero
+PASS Zero and invalid requests do not call KSP
+PASS ALL_VESSEL still respects locked and directional tanks
+PASS Unsupported flow still rejected
+PASS Native partial EC drives same-step particle scaling
+PASS TD alone performs no native EC write
+PASS ALL_VESSEL capacity describes receivers only
+ADAPTER RESULT 12 passed, 0 failed

@@ -1,0 +1,593 @@
+System.Double PartSet::ProcessRequest(Part,PartSet/ResourcePrioritySet,System.Double,System.Boolean,System.Boolean)
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldarg.3
+IL_0004: ldarg.s usePri
+IL_0006: ldarg.s pulling
+IL_0008: ldc.i4.0
+IL_0009: call System.Double PartSet::ProcessRequest(Part,PartSet/ResourcePrioritySet,System.Double,System.Boolean,System.Boolean,System.Boolean)
+IL_000e: dup
+IL_000f: pop
+IL_0010: ret
+System.Double PartSet::ProcessRequest(Part,PartSet/ResourcePrioritySet,System.Double,System.Boolean,System.Boolean,System.Boolean)
+IL_0000: ldarg.2
+IL_0001: brtrue.s IL_002a
+IL_0003: ldc.i4.5
+IL_0004: switch IL_0003
+IL_000d: ldc.i4.1
+IL_000e: brtrue.s IL_0016
+IL_0010: ldtoken System.Double PartSet::ProcessRequest(Part,PartSet/ResourcePrioritySet,System.Double,System.Boolean,System.Boolean,System.Boolean)
+IL_0015: pop
+IL_0016: ldstr "PArtSet]: Unable to process resource request. PartSet has not been setup correctly."
+IL_001b: call System.Void UnityEngine.Debug::Log(System.Object)
+IL_0020: ldc.r8 0
+IL_0029: ret
+IL_002a: ldarg.3
+IL_002b: stloc.2
+IL_002c: ldarg.s usePri
+IL_002e: brfalse IL_02d7
+IL_0033: ldc.i4.4
+IL_0034: switch IL_0033
+IL_003d: ldarg.2
+IL_003e: ldfld System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>> PartSet/ResourcePrioritySet::lists
+IL_0043: callvirt System.Int32 System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>>::get_Count()
+IL_0048: dup
+IL_0049: pop
+IL_004a: stloc.3
+IL_004b: br IL_02bd
+IL_0050: ldarg.2
+IL_0051: ldfld System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>> PartSet/ResourcePrioritySet::lists
+IL_0056: ldloc.3
+IL_0057: callvirt !0 System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>>::get_Item(System.Int32)
+IL_005c: dup
+IL_005d: pop
+IL_005e: stloc.1
+IL_005f: ldc.r8 0
+IL_0068: stloc.s V_4
+IL_006a: ldloc.2
+IL_006b: stloc.s V_5
+IL_006d: ldc.r8 0
+IL_0076: stloc.s V_6
+IL_0078: ldloc.1
+IL_0079: callvirt System.Int32 System.Collections.Generic.List`1<PartResource>::get_Count()
+IL_007e: dup
+IL_007f: pop
+IL_0080: stloc.s V_10
+IL_0082: br.s IL_00bc
+IL_0084: ldloc.1
+IL_0085: ldloc.s V_10
+IL_0087: callvirt !0 System.Collections.Generic.List`1<PartResource>::get_Item(System.Int32)
+IL_008c: dup
+IL_008d: pop
+IL_008e: stloc.0
+IL_008f: ldarg.s pulling
+IL_0091: brfalse.s IL_00aa
+IL_0093: ldc.i4.1
+IL_0094: switch IL_0093
+IL_009d: ldloc.s V_4
+IL_009f: ldloc.0
+IL_00a0: ldfld System.Double PartResource::amount
+IL_00a5: add
+IL_00a6: stloc.s V_4
+IL_00a8: br.s IL_00bc
+IL_00aa: ldloc.s V_4
+IL_00ac: ldloc.0
+IL_00ad: ldfld System.Double PartResource::amount
+IL_00b2: ldloc.0
+IL_00b3: ldfld System.Double PartResource::maxAmount
+IL_00b8: sub
+IL_00b9: add
+IL_00ba: stloc.s V_4
+IL_00bc: ldloc.s V_10
+IL_00be: dup
+IL_00bf: ldc.i4.1
+IL_00c0: sub
+IL_00c1: stloc.s V_10
+IL_00c3: ldc.i4.0
+IL_00c4: bgt.s IL_0084
+IL_00c6: ldc.i4.6
+IL_00c7: switch IL_00c6
+IL_00d0: ldloc.s V_4
+IL_00d2: ldc.r8 0
+IL_00db: beq IL_02bd
+IL_00e0: ldc.i4.6
+IL_00e1: switch IL_00e0
+IL_00ea: ldc.i4.0
+IL_00eb: stloc.s V_7
+IL_00ed: ldarg.s pulling
+IL_00ef: brfalse.s IL_010f
+IL_00f1: ldc.i4.3
+IL_00f2: switch IL_00f1
+IL_00fb: ldloc.s V_4
+IL_00fd: ldloc.2
+IL_00fe: ble.un.s IL_0121
+IL_0100: ldc.i4.1
+IL_0101: switch IL_0100
+IL_010a: ldc.i4.1
+IL_010b: stloc.s V_7
+IL_010d: br.s IL_0121
+IL_010f: ldloc.s V_4
+IL_0111: ldloc.2
+IL_0112: bge.un.s IL_0121
+IL_0114: ldc.i4.2
+IL_0115: switch IL_0114
+IL_011e: ldc.i4.1
+IL_011f: stloc.s V_7
+IL_0121: ldloc.s V_7
+IL_0123: brfalse IL_01b2
+IL_0128: ldc.i4.7
+IL_0129: switch IL_0128
+IL_0132: ldloc.2
+IL_0133: neg
+IL_0134: ldloc.s V_4
+IL_0136: div
+IL_0137: stloc.s V_11
+IL_0139: ldloc.1
+IL_013a: callvirt System.Int32 System.Collections.Generic.List`1<PartResource>::get_Count()
+IL_013f: dup
+IL_0140: pop
+IL_0141: stloc.s V_12
+IL_0143: br.s IL_0199
+IL_0145: ldloc.1
+IL_0146: ldloc.s V_12
+IL_0148: callvirt !0 System.Collections.Generic.List`1<PartResource>::get_Item(System.Int32)
+IL_014d: dup
+IL_014e: pop
+IL_014f: stloc.0
+IL_0150: ldloc.s V_11
+IL_0152: stloc.s V_13
+IL_0154: ldarg.s pulling
+IL_0156: brfalse.s IL_016f
+IL_0158: ldc.i4.6
+IL_0159: switch IL_0158
+IL_0162: ldloc.s V_13
+IL_0164: ldloc.0
+IL_0165: ldfld System.Double PartResource::amount
+IL_016a: mul
+IL_016b: stloc.s V_13
+IL_016d: br.s IL_0181
+IL_016f: ldloc.s V_13
+IL_0171: ldloc.0
+IL_0172: ldfld System.Double PartResource::amount
+IL_0177: ldloc.0
+IL_0178: ldfld System.Double PartResource::maxAmount
+IL_017d: sub
+IL_017e: mul
+IL_017f: stloc.s V_13
+IL_0181: ldloc.s V_6
+IL_0183: ldloc.0
+IL_0184: ldfld Part PartResource::part
+IL_0189: ldloc.0
+IL_018a: ldloc.s V_13
+IL_018c: ldarg.1
+IL_018d: ldarg.s simulate
+IL_018f: callvirt System.Double Part::TransferResource(PartResource,System.Double,Part,System.Boolean)
+IL_0194: dup
+IL_0195: pop
+IL_0196: add
+IL_0197: stloc.s V_6
+IL_0199: ldloc.s V_12
+IL_019b: dup
+IL_019c: ldc.i4.1
+IL_019d: sub
+IL_019e: stloc.s V_12
+IL_01a0: ldc.i4.0
+IL_01a1: bgt.s IL_0145
+IL_01a3: ldc.i4.7
+IL_01a4: switch IL_01a3
+IL_01ad: ldloc.2
+IL_01ae: ldloc.s V_6
+IL_01b0: sub
+IL_01b1: stloc.2
+IL_01b2: ldc.i4.1
+IL_01b3: stloc.s V_8
+IL_01b5: ldloc.s V_7
+IL_01b7: brfalse.s IL_01d5
+IL_01b9: ldc.i4.5
+IL_01ba: switch IL_01b9
+IL_01c3: ldloc.2
+IL_01c4: ldloc.s V_5
+IL_01c6: bne.un IL_0272
+IL_01cb: ldc.i4.4
+IL_01cc: switch IL_01cb
+IL_01d5: ldc.r8 0
+IL_01de: stloc.s V_6
+IL_01e0: ldc.i4.0
+IL_01e1: stloc.s V_8
+IL_01e3: ldloc.1
+IL_01e4: callvirt System.Int32 System.Collections.Generic.List`1<PartResource>::get_Count()
+IL_01e9: dup
+IL_01ea: pop
+IL_01eb: stloc.s V_14
+IL_01ed: br.s IL_0259
+IL_01ef: ldloc.1
+IL_01f0: ldloc.s V_14
+IL_01f2: callvirt !0 System.Collections.Generic.List`1<PartResource>::get_Item(System.Int32)
+IL_01f7: dup
+IL_01f8: pop
+IL_01f9: stloc.0
+IL_01fa: ldloc.s V_6
+IL_01fc: ldloc.0
+IL_01fd: ldfld Part PartResource::part
+IL_0202: ldloc.0
+IL_0203: ldarg.3
+IL_0204: neg
+IL_0205: ldarg.1
+IL_0206: ldarg.s simulate
+IL_0208: callvirt System.Double Part::TransferResource(PartResource,System.Double,Part,System.Boolean)
+IL_020d: dup
+IL_020e: pop
+IL_020f: add
+IL_0210: stloc.s V_6
+IL_0212: ldloc.2
+IL_0213: ldloc.s V_6
+IL_0215: sub
+IL_0216: stloc.s V_9
+IL_0218: ldarg.s pulling
+IL_021a: brfalse.s IL_023f
+IL_021c: ldc.i4.4
+IL_021d: switch IL_021c
+IL_0226: ldloc.s V_9
+IL_0228: ldarg.1
+IL_0229: ldfld System.Double Part::resourceRequestRemainingThreshold
+IL_022e: bgt.un.s IL_0259
+IL_0230: ldc.i4.1
+IL_0231: switch IL_0230
+IL_023a: ldarg.3
+IL_023b: ldloc.s V_9
+IL_023d: sub
+IL_023e: ret
+IL_023f: ldloc.s V_9
+IL_0241: ldarg.1
+IL_0242: ldfld System.Double Part::resourceRequestRemainingThreshold
+IL_0247: neg
+IL_0248: blt.un.s IL_0259
+IL_024a: ldc.i4.1
+IL_024b: switch IL_024a
+IL_0254: ldarg.3
+IL_0255: ldloc.s V_9
+IL_0257: sub
+IL_0258: ret
+IL_0259: ldloc.s V_14
+IL_025b: dup
+IL_025c: ldc.i4.1
+IL_025d: sub
+IL_025e: stloc.s V_14
+IL_0260: ldc.i4.0
+IL_0261: bgt.s IL_01ef
+IL_0263: ldc.i4.2
+IL_0264: switch IL_0263
+IL_026d: ldloc.2
+IL_026e: ldloc.s V_6
+IL_0270: sub
+IL_0271: stloc.2
+IL_0272: ldloc.s V_8
+IL_0274: brfalse.s IL_02bd
+IL_0276: ldc.i4.1
+IL_0277: switch IL_0276
+IL_0280: ldarg.s pulling
+IL_0282: brfalse.s IL_02a5
+IL_0284: ldc.i4.2
+IL_0285: switch IL_0284
+IL_028e: ldloc.2
+IL_028f: ldarg.1
+IL_0290: ldfld System.Double Part::resourceRequestRemainingThreshold
+IL_0295: bgt.un.s IL_02bd
+IL_0297: ldc.i4.3
+IL_0298: switch IL_0297
+IL_02a1: ldarg.3
+IL_02a2: ldloc.2
+IL_02a3: sub
+IL_02a4: ret
+IL_02a5: ldloc.2
+IL_02a6: ldarg.1
+IL_02a7: ldfld System.Double Part::resourceRequestRemainingThreshold
+IL_02ac: neg
+IL_02ad: blt.un.s IL_02bd
+IL_02af: ldc.i4.3
+IL_02b0: switch IL_02af
+IL_02b9: ldarg.3
+IL_02ba: ldloc.2
+IL_02bb: sub
+IL_02bc: ret
+IL_02bd: ldloc.3
+IL_02be: dup
+IL_02bf: ldc.i4.1
+IL_02c0: sub
+IL_02c1: stloc.3
+IL_02c2: ldc.i4.0
+IL_02c3: bgt IL_0050
+IL_02c8: ldc.i4.3
+IL_02c9: switch IL_02c8
+IL_02d2: br IL_0596
+IL_02d7: ldc.r8 0
+IL_02e0: stloc.s V_15
+IL_02e2: ldarg.2
+IL_02e3: ldfld System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>> PartSet/ResourcePrioritySet::lists
+IL_02e8: callvirt System.Int32 System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>>::get_Count()
+IL_02ed: dup
+IL_02ee: pop
+IL_02ef: stloc.s V_19
+IL_02f1: br.s IL_035b
+IL_02f3: ldarg.2
+IL_02f4: ldfld System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>> PartSet/ResourcePrioritySet::lists
+IL_02f9: ldloc.s V_19
+IL_02fb: callvirt !0 System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>>::get_Item(System.Int32)
+IL_0300: dup
+IL_0301: pop
+IL_0302: stloc.1
+IL_0303: ldloc.1
+IL_0304: callvirt System.Int32 System.Collections.Generic.List`1<PartResource>::get_Count()
+IL_0309: dup
+IL_030a: pop
+IL_030b: stloc.s V_20
+IL_030d: br.s IL_0347
+IL_030f: ldloc.1
+IL_0310: ldloc.s V_20
+IL_0312: callvirt !0 System.Collections.Generic.List`1<PartResource>::get_Item(System.Int32)
+IL_0317: dup
+IL_0318: pop
+IL_0319: stloc.0
+IL_031a: ldarg.s pulling
+IL_031c: brfalse.s IL_0335
+IL_031e: ldc.i4.7
+IL_031f: switch IL_031e
+IL_0328: ldloc.s V_15
+IL_032a: ldloc.0
+IL_032b: ldfld System.Double PartResource::amount
+IL_0330: add
+IL_0331: stloc.s V_15
+IL_0333: br.s IL_0347
+IL_0335: ldloc.s V_15
+IL_0337: ldloc.0
+IL_0338: ldfld System.Double PartResource::amount
+IL_033d: ldloc.0
+IL_033e: ldfld System.Double PartResource::maxAmount
+IL_0343: sub
+IL_0344: add
+IL_0345: stloc.s V_15
+IL_0347: ldloc.s V_20
+IL_0349: dup
+IL_034a: ldc.i4.1
+IL_034b: sub
+IL_034c: stloc.s V_20
+IL_034e: ldc.i4.0
+IL_034f: bgt.s IL_030f
+IL_0351: ldc.i4.6
+IL_0352: switch IL_0351
+IL_035b: ldloc.s V_19
+IL_035d: dup
+IL_035e: ldc.i4.1
+IL_035f: sub
+IL_0360: stloc.s V_19
+IL_0362: ldc.i4.0
+IL_0363: bgt.s IL_02f3
+IL_0365: ldc.i4.6
+IL_0366: switch IL_0365
+IL_036f: ldloc.s V_15
+IL_0371: ldc.r8 0
+IL_037a: bne.un.s IL_0390
+IL_037c: ldc.i4.3
+IL_037d: switch IL_037c
+IL_0386: ldc.r8 0
+IL_038f: ret
+IL_0390: ldc.i4.0
+IL_0391: stloc.s V_16
+IL_0393: ldarg.s pulling
+IL_0395: brfalse.s IL_03b5
+IL_0397: ldc.i4.5
+IL_0398: switch IL_0397
+IL_03a1: ldloc.s V_15
+IL_03a3: ldloc.2
+IL_03a4: ble.un.s IL_03c7
+IL_03a6: ldc.i4.6
+IL_03a7: switch IL_03a6
+IL_03b0: ldc.i4.1
+IL_03b1: stloc.s V_16
+IL_03b3: br.s IL_03c7
+IL_03b5: ldloc.s V_15
+IL_03b7: ldloc.2
+IL_03b8: bge.un.s IL_03c7
+IL_03ba: ldc.i4.6
+IL_03bb: switch IL_03ba
+IL_03c4: ldc.i4.1
+IL_03c5: stloc.s V_16
+IL_03c7: ldloc.2
+IL_03c8: stloc.s V_17
+IL_03ca: ldc.r8 0
+IL_03d3: stloc.s V_18
+IL_03d5: ldloc.s V_16
+IL_03d7: brfalse IL_04a1
+IL_03dc: ldc.i4.3
+IL_03dd: switch IL_03dc
+IL_03e6: ldloc.2
+IL_03e7: neg
+IL_03e8: ldloc.s V_15
+IL_03ea: div
+IL_03eb: stloc.s V_21
+IL_03ed: ldarg.2
+IL_03ee: ldfld System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>> PartSet/ResourcePrioritySet::lists
+IL_03f3: callvirt System.Int32 System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>>::get_Count()
+IL_03f8: dup
+IL_03f9: pop
+IL_03fa: stloc.s V_22
+IL_03fc: br IL_0485
+IL_0401: ldarg.2
+IL_0402: ldfld System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>> PartSet/ResourcePrioritySet::lists
+IL_0407: ldloc.s V_22
+IL_0409: callvirt !0 System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>>::get_Item(System.Int32)
+IL_040e: dup
+IL_040f: pop
+IL_0410: stloc.1
+IL_0411: ldloc.1
+IL_0412: callvirt System.Int32 System.Collections.Generic.List`1<PartResource>::get_Count()
+IL_0417: dup
+IL_0418: pop
+IL_0419: stloc.s V_23
+IL_041b: br.s IL_0471
+IL_041d: ldloc.1
+IL_041e: ldloc.s V_23
+IL_0420: callvirt !0 System.Collections.Generic.List`1<PartResource>::get_Item(System.Int32)
+IL_0425: dup
+IL_0426: pop
+IL_0427: stloc.0
+IL_0428: ldloc.s V_21
+IL_042a: stloc.s V_24
+IL_042c: ldarg.s pulling
+IL_042e: brfalse.s IL_0447
+IL_0430: ldc.i4.2
+IL_0431: switch IL_0430
+IL_043a: ldloc.s V_24
+IL_043c: ldloc.0
+IL_043d: ldfld System.Double PartResource::amount
+IL_0442: mul
+IL_0443: stloc.s V_24
+IL_0445: br.s IL_0459
+IL_0447: ldloc.s V_24
+IL_0449: ldloc.0
+IL_044a: ldfld System.Double PartResource::amount
+IL_044f: ldloc.0
+IL_0450: ldfld System.Double PartResource::maxAmount
+IL_0455: sub
+IL_0456: mul
+IL_0457: stloc.s V_24
+IL_0459: ldloc.s V_18
+IL_045b: ldloc.0
+IL_045c: ldfld Part PartResource::part
+IL_0461: ldloc.0
+IL_0462: ldloc.s V_24
+IL_0464: ldarg.1
+IL_0465: ldarg.s simulate
+IL_0467: callvirt System.Double Part::TransferResource(PartResource,System.Double,Part,System.Boolean)
+IL_046c: dup
+IL_046d: pop
+IL_046e: add
+IL_046f: stloc.s V_18
+IL_0471: ldloc.s V_23
+IL_0473: dup
+IL_0474: ldc.i4.1
+IL_0475: sub
+IL_0476: stloc.s V_23
+IL_0478: ldc.i4.0
+IL_0479: bgt.s IL_041d
+IL_047b: ldc.i4.3
+IL_047c: switch IL_047b
+IL_0485: ldloc.s V_22
+IL_0487: dup
+IL_0488: ldc.i4.1
+IL_0489: sub
+IL_048a: stloc.s V_22
+IL_048c: ldc.i4.0
+IL_048d: bgt IL_0401
+IL_0492: ldc.i4.6
+IL_0493: switch IL_0492
+IL_049c: ldloc.2
+IL_049d: ldloc.s V_18
+IL_049f: sub
+IL_04a0: stloc.2
+IL_04a1: ldloc.s V_16
+IL_04a3: brfalse.s IL_04c1
+IL_04a5: ldc.i4.1
+IL_04a6: switch IL_04a5
+IL_04af: ldloc.2
+IL_04b0: ldloc.s V_17
+IL_04b2: bne.un IL_0596
+IL_04b7: ldc.i4.1
+IL_04b8: switch IL_04b7
+IL_04c1: ldc.r8 0
+IL_04ca: stloc.s V_18
+IL_04cc: ldarg.2
+IL_04cd: ldfld System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>> PartSet/ResourcePrioritySet::lists
+IL_04d2: callvirt System.Int32 System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>>::get_Count()
+IL_04d7: dup
+IL_04d8: pop
+IL_04d9: stloc.s V_26
+IL_04db: br IL_057a
+IL_04e0: ldarg.2
+IL_04e1: ldfld System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>> PartSet/ResourcePrioritySet::lists
+IL_04e6: ldloc.s V_26
+IL_04e8: callvirt !0 System.Collections.Generic.List`1<System.Collections.Generic.List`1<PartResource>>::get_Item(System.Int32)
+IL_04ed: dup
+IL_04ee: pop
+IL_04ef: stloc.1
+IL_04f0: ldloc.1
+IL_04f1: callvirt System.Int32 System.Collections.Generic.List`1<PartResource>::get_Count()
+IL_04f6: dup
+IL_04f7: pop
+IL_04f8: stloc.s V_27
+IL_04fa: br.s IL_0566
+IL_04fc: ldloc.1
+IL_04fd: ldloc.s V_27
+IL_04ff: callvirt !0 System.Collections.Generic.List`1<PartResource>::get_Item(System.Int32)
+IL_0504: dup
+IL_0505: pop
+IL_0506: stloc.0
+IL_0507: ldloc.s V_18
+IL_0509: ldloc.0
+IL_050a: ldfld Part PartResource::part
+IL_050f: ldloc.0
+IL_0510: ldarg.3
+IL_0511: neg
+IL_0512: ldarg.1
+IL_0513: ldarg.s simulate
+IL_0515: callvirt System.Double Part::TransferResource(PartResource,System.Double,Part,System.Boolean)
+IL_051a: dup
+IL_051b: pop
+IL_051c: add
+IL_051d: stloc.s V_18
+IL_051f: ldloc.2
+IL_0520: ldloc.s V_18
+IL_0522: sub
+IL_0523: stloc.s V_25
+IL_0525: ldarg.s pulling
+IL_0527: brfalse.s IL_054c
+IL_0529: ldc.i4.2
+IL_052a: switch IL_0529
+IL_0533: ldloc.s V_25
+IL_0535: ldarg.1
+IL_0536: ldfld System.Double Part::resourceRequestRemainingThreshold
+IL_053b: bgt.un.s IL_0566
+IL_053d: ldc.i4.5
+IL_053e: switch IL_053d
+IL_0547: ldarg.3
+IL_0548: ldloc.s V_25
+IL_054a: sub
+IL_054b: ret
+IL_054c: ldloc.s V_25
+IL_054e: ldarg.1
+IL_054f: ldfld System.Double Part::resourceRequestRemainingThreshold
+IL_0554: neg
+IL_0555: blt.un.s IL_0566
+IL_0557: ldc.i4.1
+IL_0558: switch IL_0557
+IL_0561: ldarg.3
+IL_0562: ldloc.s V_25
+IL_0564: sub
+IL_0565: ret
+IL_0566: ldloc.s V_27
+IL_0568: dup
+IL_0569: ldc.i4.1
+IL_056a: sub
+IL_056b: stloc.s V_27
+IL_056d: ldc.i4.0
+IL_056e: bgt.s IL_04fc
+IL_0570: ldc.i4.3
+IL_0571: switch IL_0570
+IL_057a: ldloc.s V_26
+IL_057c: dup
+IL_057d: ldc.i4.1
+IL_057e: sub
+IL_057f: stloc.s V_26
+IL_0581: ldc.i4.0
+IL_0582: bgt IL_04e0
+IL_0587: ldc.i4.3
+IL_0588: switch IL_0587
+IL_0591: ldloc.2
+IL_0592: ldloc.s V_18
+IL_0594: sub
+IL_0595: stloc.2
+IL_0596: ldarg.3
+IL_0597: ldloc.2
+IL_0598: sub
+IL_0599: ret

@@ -73,12 +73,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="GNsword.cs" />
-<<<<<<< Updated upstream
-    <Compile Include="GNVisuals.cs" />
-    <Compile Include="PID.cs" />
-=======
     <Compile Include="GNSystems.cs" />
->>>>>>> Stashed changes
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

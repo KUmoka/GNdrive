@@ -53,13 +53,19 @@ public class Part
     public void GetConnectedResourceTotals(int resourceId, ResourceFlowMode flowMode, out double amount, out double maxAmount, bool pulling)
     {
         Totals++; LastId = resourceId; LastMode = flowMode; LastPulling = pulling;
-        amount = NativeAmount; maxAmount = NativeCapacity;
+        // Verified against KSP 1.12.5 PartSet.GetConnectedResourceTotals IL.
+        amount = pulling ? NativeAmount : NativeCapacity - NativeAmount; maxAmount = NativeCapacity;
     }
 }
 public class Vessel { public Part rootPart; public readonly List<Part> parts = new List<Part>(); }
 
 class ResourceAdapterTests
 {
+    sealed class Baryons : IBaryonPort
+    {
+        public double Taken;
+        public double TakeEnergy(double request) { Taken += request; return request; }
+    }
     static int passed, failed;
     static void Equal(double actual, double expected)
     { if (!Numbers.Finite(actual) || Math.Abs(actual - expected) > 1e-8) throw new Exception(actual + " != " + expected); }
@@ -95,6 +101,26 @@ class ResourceAdapterTests
             Equal(port.Capacity, 100); Check(!v.rootPart.LastPulling);
             Equal(port.FreeSpace, 60); Check(!v.rootPart.LastPulling);
             Equal(v.rootPart.LastId, 7); Check(v.rootPart.LastMode == ResourceFlowMode.STAGE_PRIORITY_FLOW); Equal(v.rootPart.Requests, 0);
+        });
+        Test("Empty EC can recharge and full EC has no receiving space", () =>
+        {
+            var v = NewVessel(); var port = new KspResourcePort(v, "ElectricCharge");
+            v.rootPart.NativeAmount = 0; Equal(port.FreeSpace,100);
+            Equal(port.Put(25),25); Equal(port.FreeSpace,75);
+            v.rootPart.NativeAmount = 100; Equal(port.FreeSpace,0);
+        });
+        Test("Automatic Blanket restarts at zero EC with furnace OFF", () =>
+        {
+            var v=NewVessel(); v.rootPart.NativeAmount=0;
+            var ec=new KspResourcePort(v,"ElectricCharge"); var fuel=new Baryons();
+            var d=new DriveState { Id=1, Generate=false, TDQuantity=30, TDCapacity=100,
+                Definition=new DriveDefinition { TD=true,TDBlanket=true,Generation=true,BlanketECGenerationRate=200 } };
+            var sim=new VesselSimulation(); var input=new StepInput { Dt=1,MassKg=1000 };
+            var settings=new VesselSettings { ECMargin = 0 }; var particles=new KspResourcePort(v,"GNparticle");
+            var r=sim.Step(new[]{d},settings,input,particles,ec,fuel);
+            Equal(r.ECStored,60); Equal(v.rootPart.NativeAmount,60); Equal(fuel.Taken,60);
+            sim.Step(new[]{d},settings,input,particles,ec,fuel); Equal(v.rootPart.NativeAmount,100); Equal(fuel.Taken,100);
+            sim.Step(new[]{d},settings,input,particles,ec,fuel); Equal(fuel.Taken,100);
         });
         Test("EC take delegates once and returns actual amount", () =>
         {
@@ -137,17 +163,17 @@ class ResourceAdapterTests
         {
             var v = NewVessel(); v.rootPart.TakeLimit = 5;
             var d = new DriveState { Id = 1, Engine = true, TankCapacity = 100, Definition = new DriveDefinition { Propulsion = true, Generation = true, ParticleGenerationRate = 100 } };
-            var r = new VesselSimulation().Step(new[] { d }, new VesselSettings { SafeGuard = true },
+            var r = new VesselSimulation().Step(new[] { d }, new VesselSettings { ECMargin = 0, SafeGuard = true },
                 new StepInput { Dt = 1, MassKg = 1000, Throttle = 1 }, new KspResourcePort(v, "GNparticle"), new KspResourcePort(v, "ElectricCharge"));
-            Equal(r.ECTaken, 5); Equal(r.Generated, 5); Equal(r.Consumed, 5); Equal(v.rootPart.Requests, 1); Equal(r.ParticleTaken, 0);
+            Equal(r.ECTaken, 5); Equal(r.Generated, 0.5); Equal(r.Consumed, 0.5); Equal(v.rootPart.Requests, 1); Equal(r.ParticleTaken, 0);
         });
-        Test("TD surplus uses native actual EC acceptance", () =>
+        Test("TD alone performs no native EC write", () =>
         {
             var v = NewVessel(); v.rootPart.NativeAmount = 99;
             var d = new DriveState { Id = 1, TDQuantity = 5, Definition = new DriveDefinition { TD = true, ECPerTDSecond = 2 } };
-            var r = new VesselSimulation().Step(new[] { d }, new VesselSettings(), new StepInput { Dt = 1, MassKg = 1000 },
+            var r = new VesselSimulation().Step(new[] { d }, new VesselSettings { ECMargin = 0 }, new StepInput { Dt = 1, MassKg = 1000 },
                 new KspResourcePort(v, "GNparticle"), new KspResourcePort(v, "ElectricCharge"));
-            Equal(r.ECGenerated, 10); Equal(r.ECStored, 1); Equal(r.ECSpilled, 9); Equal(v.rootPart.LastDemand, -10); Equal(v.rootPart.Requests, 1);
+            Equal(r.ECGenerated, 0); Equal(r.ECStored, 0); Equal(r.ECSpilled, 0); Equal(v.rootPart.Requests, 0);
         });
         Test("ALL_VESSEL capacity describes receivers only", () =>
         {

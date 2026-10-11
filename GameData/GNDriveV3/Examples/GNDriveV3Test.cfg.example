@@ -45,7 +45,8 @@ PART
         Power = 100
         MaxGContribution = 5
         ParticleGenerationRate = 100
-        ECPerParticle = 1
+        BlanketECGenerationRate = 2000
+        ECPerParticle = 10
         ECPerTDSecond = 2
         TransAMRatio = 3
         MaxTorqueNm = 10000
@@ -66,6 +67,7 @@ PART
             variant = Boost
             Power = 150
             ParticleGenerationRate = 150
+            BlanketECGenerationRate = 3000
             ECPerTDSecond = 3
         }
     }

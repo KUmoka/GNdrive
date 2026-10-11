@@ -1,0 +1,917 @@
+System.Single Part::RequestResource(System.Int32,System.Single)
+IL_0000: ldarg.1
+IL_0001: call ResourceFlowMode PartResourceLibrary::GetDefaultFlowMode(System.Int32)
+IL_0006: dup
+IL_0007: pop
+IL_0008: stloc.0
+IL_0009: ldloc.0
+IL_000a: ldc.i4.8
+IL_000b: beq.s IL_002f
+IL_000d: ldc.i4.2
+IL_000e: switch IL_000d
+IL_0017: ldc.i4.1
+IL_0018: brtrue.s IL_0020
+IL_001a: ldtoken System.Single Part::RequestResource(System.Int32,System.Single)
+IL_001f: pop
+IL_0020: ldarg.0
+IL_0021: ldarg.0
+IL_0022: ldarg.1
+IL_0023: ldloc.0
+IL_0024: ldarg.2
+IL_0025: conv.r8
+IL_0026: call System.Double Part::requestResource(Part,System.Int32,ResourceFlowMode,System.Double)
+IL_002b: dup
+IL_002c: pop
+IL_002d: conv.r4
+IL_002e: ret
+IL_002f: ldc.r4 0
+IL_0034: ret
+System.Single Part::RequestResource(System.String,System.Single)
+IL_0000: ldarg.1
+IL_0001: call ResourceFlowMode PartResourceLibrary::GetDefaultFlowMode(System.String)
+IL_0006: dup
+IL_0007: pop
+IL_0008: stloc.0
+IL_0009: ldloc.0
+IL_000a: ldc.i4.8
+IL_000b: beq.s IL_0036
+IL_000d: ldc.i4.4
+IL_000e: switch IL_000d
+IL_0017: ldc.i4.1
+IL_0018: brtrue.s IL_0020
+IL_001a: ldtoken System.Single Part::RequestResource(System.String,System.Single)
+IL_001f: pop
+IL_0020: ldarg.0
+IL_0021: ldarg.0
+IL_0022: ldarg.1
+IL_0023: callvirt System.Int32 System.Object::GetHashCode()
+IL_0028: dup
+IL_0029: pop
+IL_002a: ldloc.0
+IL_002b: ldarg.2
+IL_002c: conv.r8
+IL_002d: call System.Double Part::requestResource(Part,System.Int32,ResourceFlowMode,System.Double)
+IL_0032: dup
+IL_0033: pop
+IL_0034: conv.r4
+IL_0035: ret
+IL_0036: ldc.r4 0
+IL_003b: ret
+System.Double Part::RequestResource(System.Int32,System.Double)
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldc.i4.0
+IL_0004: callvirt System.Double Part::RequestResource(System.Int32,System.Double,System.Boolean)
+IL_0009: dup
+IL_000a: pop
+IL_000b: ret
+System.Double Part::RequestResource(System.Int32,System.Double,System.Boolean)
+IL_0000: ldarg.1
+IL_0001: call ResourceFlowMode PartResourceLibrary::GetDefaultFlowMode(System.Int32)
+IL_0006: dup
+IL_0007: pop
+IL_0008: stloc.0
+IL_0009: ldloc.0
+IL_000a: ldc.i4.8
+IL_000b: beq.s IL_002e
+IL_000d: ldc.i4.2
+IL_000e: switch IL_000d
+IL_0017: ldc.i4.1
+IL_0018: brtrue.s IL_0020
+IL_001a: ldtoken System.Double Part::RequestResource(System.Int32,System.Double,System.Boolean)
+IL_001f: pop
+IL_0020: ldarg.0
+IL_0021: ldarg.0
+IL_0022: ldarg.1
+IL_0023: ldloc.0
+IL_0024: ldarg.2
+IL_0025: ldarg.3
+IL_0026: call System.Double Part::requestResource(Part,System.Int32,ResourceFlowMode,System.Double,System.Boolean)
+IL_002b: dup
+IL_002c: pop
+IL_002d: ret
+IL_002e: ldc.r8 0
+IL_0037: ret
+System.Double Part::RequestResource(System.String,System.Double)
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldc.i4.0
+IL_0004: callvirt System.Double Part::RequestResource(System.String,System.Double,System.Boolean)
+IL_0009: dup
+IL_000a: pop
+IL_000b: ret
+System.Double Part::RequestResource(System.String,System.Double,System.Boolean)
+IL_0000: ldarg.1
+IL_0001: call ResourceFlowMode PartResourceLibrary::GetDefaultFlowMode(System.String)
+IL_0006: dup
+IL_0007: pop
+IL_0008: stloc.0
+IL_0009: ldloc.0
+IL_000a: ldc.i4.8
+IL_000b: beq.s IL_0035
+IL_000d: ldc.i4.2
+IL_000e: switch IL_000d
+IL_0017: ldc.i4.1
+IL_0018: brtrue.s IL_0020
+IL_001a: ldtoken System.Double Part::RequestResource(System.String,System.Double,System.Boolean)
+IL_001f: pop
+IL_0020: ldarg.0
+IL_0021: ldarg.0
+IL_0022: ldarg.1
+IL_0023: callvirt System.Int32 System.Object::GetHashCode()
+IL_0028: dup
+IL_0029: pop
+IL_002a: ldloc.0
+IL_002b: ldarg.2
+IL_002c: ldarg.3
+IL_002d: call System.Double Part::requestResource(Part,System.Int32,ResourceFlowMode,System.Double,System.Boolean)
+IL_0032: dup
+IL_0033: pop
+IL_0034: ret
+IL_0035: ldc.r8 0
+IL_003e: ret
+System.Double Part::RequestResource(System.Int32,System.Double,ResourceFlowMode)
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldarg.3
+IL_0004: ldc.i4.0
+IL_0005: callvirt System.Double Part::RequestResource(System.Int32,System.Double,ResourceFlowMode,System.Boolean)
+IL_000a: dup
+IL_000b: pop
+IL_000c: ret
+System.Double Part::RequestResource(System.Int32,System.Double,ResourceFlowMode,System.Boolean)
+IL_0000: ldarg.0
+IL_0001: ldarg.0
+IL_0002: ldarg.1
+IL_0003: ldarg.3
+IL_0004: ldarg.2
+IL_0005: ldarg.s simulate
+IL_0007: call System.Double Part::requestResource(Part,System.Int32,ResourceFlowMode,System.Double,System.Boolean)
+IL_000c: dup
+IL_000d: pop
+IL_000e: ret
+System.Double Part::RequestResource(System.String,System.Double,ResourceFlowMode)
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldarg.3
+IL_0004: ldc.i4.0
+IL_0005: callvirt System.Double Part::RequestResource(System.String,System.Double,ResourceFlowMode,System.Boolean)
+IL_000a: dup
+IL_000b: pop
+IL_000c: ret
+System.Double Part::RequestResource(System.String,System.Double,ResourceFlowMode,System.Boolean)
+IL_0000: ldarg.0
+IL_0001: ldarg.0
+IL_0002: ldarg.1
+IL_0003: callvirt System.Int32 System.Object::GetHashCode()
+IL_0008: dup
+IL_0009: pop
+IL_000a: ldarg.3
+IL_000b: ldarg.2
+IL_000c: ldarg.s simulate
+IL_000e: call System.Double Part::requestResource(Part,System.Int32,ResourceFlowMode,System.Double,System.Boolean)
+IL_0013: dup
+IL_0014: pop
+IL_0015: ret
+System.Double Part::requestResource(Part,System.Int32,ResourceFlowMode,System.Double)
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldarg.3
+IL_0004: ldarg.s demand
+IL_0006: ldc.i4.0
+IL_0007: call System.Double Part::requestResource(Part,System.Int32,ResourceFlowMode,System.Double,System.Boolean)
+IL_000c: dup
+IL_000d: pop
+IL_000e: ret
+System.Double Part::requestResource(Part,System.Int32,ResourceFlowMode,System.Double,System.Boolean)
+IL_0000: ldarg.s demand
+IL_0002: ldc.r8 0
+IL_000b: bne.un.s IL_002a
+IL_000d: ldc.i4.6
+IL_000e: switch IL_000d
+IL_0017: ldc.i4.1
+IL_0018: brtrue.s IL_0020
+IL_001a: ldtoken System.Double Part::requestResource(Part,System.Int32,ResourceFlowMode,System.Double,System.Boolean)
+IL_001f: pop
+IL_0020: ldc.r8 0
+IL_0029: ret
+IL_002a: ldsfld System.Boolean CheatOptions::InfiniteElectricity
+IL_002f: brfalse.s IL_0067
+IL_0031: ldc.i4.2
+IL_0032: switch IL_0031
+IL_003b: ldarg.2
+IL_003c: ldsfld System.Int32 PartResourceLibrary::ElectricityHashcode
+IL_0041: bne.un.s IL_0067
+IL_0043: ldc.i4.5
+IL_0044: switch IL_0043
+IL_004d: ldarg.s demand
+IL_004f: ldc.r8 0
+IL_0058: ble.un.s IL_0067
+IL_005a: ldc.i4.2
+IL_005b: switch IL_005a
+IL_0064: ldarg.s demand
+IL_0066: ret
+IL_0067: ldarg.3
+IL_0068: switch IL_008d,IL_00ff,IL_01b4,IL_0269,IL_00ff,IL_01b4,IL_0269,IL_0269
+IL_008d: ldarg.s simulate
+IL_008f: brtrue.s IL_00ba
+IL_0091: ldc.i4.5
+IL_0092: switch IL_0091
+IL_009b: ldarg.0
+IL_009c: call PartResourceList Part::get_Resources()
+IL_00a1: dup
+IL_00a2: pop
+IL_00a3: ldarg.2
+IL_00a4: ldarg.s demand
+IL_00a6: ldc.r8 0
+IL_00af: cgt
+IL_00b1: callvirt PartResource PartResourceList::GetFlowing(System.Int32,System.Boolean)
+IL_00b6: dup
+IL_00b7: pop
+IL_00b8: br.s IL_00d7
+IL_00ba: ldarg.0
+IL_00bb: call PartResourceList Part::get_SimulationResources()
+IL_00c0: dup
+IL_00c1: pop
+IL_00c2: ldarg.2
+IL_00c3: ldarg.s demand
+IL_00c5: ldc.r8 0
+IL_00ce: cgt
+IL_00d0: callvirt PartResource PartResourceList::GetFlowing(System.Int32,System.Boolean)
+IL_00d5: dup
+IL_00d6: pop
+IL_00d7: stloc.0
+IL_00d8: ldloc.0
+IL_00d9: brfalse.s IL_00f5
+IL_00db: ldc.i4.5
+IL_00dc: switch IL_00db
+IL_00e5: ldarg.0
+IL_00e6: ldloc.0
+IL_00e7: ldarg.s demand
+IL_00e9: neg
+IL_00ea: ldarg.0
+IL_00eb: ldarg.s simulate
+IL_00ed: callvirt System.Double Part::TransferResource(PartResource,System.Double,Part,System.Boolean)
+IL_00f2: dup
+IL_00f3: pop
+IL_00f4: ret
+IL_00f5: ldc.r8 0
+IL_00fe: ret
+IL_00ff: ldarg.0
+IL_0100: ldfld Vessel Part::vessel
+IL_0105: ldnull
+IL_0106: call System.Boolean UnityEngine.Object::op_Equality(UnityEngine.Object,UnityEngine.Object)
+IL_010b: dup
+IL_010c: pop
+IL_010d: brfalse.s IL_0135
+IL_010f: ldc.i4.6
+IL_0110: switch IL_010f
+IL_0119: ldarg.0
+IL_011a: ldfld ShipConstruct Part::ship
+IL_011f: brtrue.s IL_0135
+IL_0121: ldc.i4.2
+IL_0122: switch IL_0121
+IL_012b: ldc.r8 0
+IL_0134: ret
+IL_0135: ldarg.s simulate
+IL_0137: brfalse.s IL_017b
+IL_0139: ldc.i4.1
+IL_013a: switch IL_0139
+IL_0143: ldarg.0
+IL_0144: ldfld ShipConstruct Part::ship
+IL_0149: brfalse.s IL_017b
+IL_014b: ldc.i4.4
+IL_014c: switch IL_014b
+IL_0155: ldsfld System.Boolean HighLogic::LoadedSceneIsEditor
+IL_015a: brfalse.s IL_017b
+IL_015c: ldc.i4.1
+IL_015d: switch IL_015c
+IL_0166: ldarg.0
+IL_0167: ldfld ShipConstruct Part::ship
+IL_016c: ldarg.0
+IL_016d: ldarg.2
+IL_016e: ldarg.s demand
+IL_0170: ldc.i4.0
+IL_0171: ldarg.s simulate
+IL_0173: callvirt System.Double ShipConstruct::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_0178: dup
+IL_0179: pop
+IL_017a: ret
+IL_017b: ldarg.0
+IL_017c: ldfld Vessel Part::vessel
+IL_0181: ldnull
+IL_0182: call System.Boolean UnityEngine.Object::op_Inequality(UnityEngine.Object,UnityEngine.Object)
+IL_0187: dup
+IL_0188: pop
+IL_0189: brfalse.s IL_01aa
+IL_018b: ldc.i4.7
+IL_018c: switch IL_018b
+IL_0195: ldarg.0
+IL_0196: ldfld Vessel Part::vessel
+IL_019b: ldarg.0
+IL_019c: ldarg.2
+IL_019d: ldarg.s demand
+IL_019f: ldc.i4.0
+IL_01a0: ldarg.s simulate
+IL_01a2: callvirt System.Double Vessel::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_01a7: dup
+IL_01a8: pop
+IL_01a9: ret
+IL_01aa: ldc.r8 0
+IL_01b3: ret
+IL_01b4: ldarg.0
+IL_01b5: ldfld Vessel Part::vessel
+IL_01ba: ldnull
+IL_01bb: call System.Boolean UnityEngine.Object::op_Equality(UnityEngine.Object,UnityEngine.Object)
+IL_01c0: dup
+IL_01c1: pop
+IL_01c2: brfalse.s IL_01ea
+IL_01c4: ldc.i4.1
+IL_01c5: switch IL_01c4
+IL_01ce: ldarg.0
+IL_01cf: ldfld ShipConstruct Part::ship
+IL_01d4: brtrue.s IL_01ea
+IL_01d6: ldc.i4.5
+IL_01d7: switch IL_01d6
+IL_01e0: ldc.r8 0
+IL_01e9: ret
+IL_01ea: ldarg.s simulate
+IL_01ec: brfalse.s IL_0230
+IL_01ee: ldc.i4.7
+IL_01ef: switch IL_01ee
+IL_01f8: ldarg.0
+IL_01f9: ldfld ShipConstruct Part::ship
+IL_01fe: brfalse.s IL_0230
+IL_0200: ldc.i4.7
+IL_0201: switch IL_0200
+IL_020a: ldsfld System.Boolean HighLogic::LoadedSceneIsEditor
+IL_020f: brfalse.s IL_0230
+IL_0211: ldc.i4.2
+IL_0212: switch IL_0211
+IL_021b: ldarg.0
+IL_021c: ldfld ShipConstruct Part::ship
+IL_0221: ldarg.0
+IL_0222: ldarg.2
+IL_0223: ldarg.s demand
+IL_0225: ldc.i4.1
+IL_0226: ldarg.s simulate
+IL_0228: callvirt System.Double ShipConstruct::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_022d: dup
+IL_022e: pop
+IL_022f: ret
+IL_0230: ldarg.0
+IL_0231: ldfld Vessel Part::vessel
+IL_0236: ldnull
+IL_0237: call System.Boolean UnityEngine.Object::op_Inequality(UnityEngine.Object,UnityEngine.Object)
+IL_023c: dup
+IL_023d: pop
+IL_023e: brfalse.s IL_025f
+IL_0240: ldc.i4.2
+IL_0241: switch IL_0240
+IL_024a: ldarg.0
+IL_024b: ldfld Vessel Part::vessel
+IL_0250: ldarg.0
+IL_0251: ldarg.2
+IL_0252: ldarg.s demand
+IL_0254: ldc.i4.1
+IL_0255: ldarg.s simulate
+IL_0257: callvirt System.Double Vessel::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_025c: dup
+IL_025d: pop
+IL_025e: ret
+IL_025f: ldc.r8 0
+IL_0268: ret
+IL_0269: ldarg.s simulate
+IL_026b: brtrue.s IL_028c
+IL_026d: ldc.i4.5
+IL_026e: switch IL_026d
+IL_0277: ldarg.0
+IL_0278: ldfld PartSet Part::crossfeedPartSet
+IL_027d: ldarg.0
+IL_027e: ldarg.2
+IL_027f: ldarg.s demand
+IL_0281: ldc.i4.1
+IL_0282: ldarg.s simulate
+IL_0284: callvirt System.Double PartSet::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_0289: dup
+IL_028a: pop
+IL_028b: ret
+IL_028c: ldarg.0
+IL_028d: ldfld PartSet Part::simulationCrossfeedPartSet
+IL_0292: ldarg.0
+IL_0293: ldarg.2
+IL_0294: ldarg.s demand
+IL_0296: ldc.i4.1
+IL_0297: ldarg.s simulate
+IL_0299: callvirt System.Double PartSet::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_029e: dup
+IL_029f: pop
+IL_02a0: ret
+System.Double Part::TransferResource(System.Int32,System.Double)
+IL_0000: ldarg.0
+IL_0001: call PartResourceList Part::get_Resources()
+IL_0006: dup
+IL_0007: pop
+IL_0008: ldarg.1
+IL_0009: callvirt PartResource PartResourceList::Get(System.Int32)
+IL_000e: dup
+IL_000f: pop
+IL_0010: stloc.0
+IL_0011: ldloc.0
+IL_0012: brtrue.s IL_0055
+IL_0014: ldc.i4.5
+IL_0015: switch IL_0014
+IL_001e: ldc.i4.1
+IL_001f: brtrue.s IL_0027
+IL_0021: ldtoken System.Double Part::TransferResource(System.Int32,System.Double)
+IL_0026: pop
+IL_0027: ldstr "Resource System Error: Resource id "
+IL_002c: ldarg.1
+IL_002d: box System.Int32
+IL_0032: ldstr " does not exist in part"
+IL_0037: call System.String System.String::Concat(System.Object,System.Object,System.Object)
+IL_003c: dup
+IL_003d: pop
+IL_003e: ldarg.0
+IL_003f: call UnityEngine.GameObject UnityEngine.Component::get_gameObject()
+IL_0044: dup
+IL_0045: pop
+IL_0046: call System.Void UnityEngine.Debug::LogError(System.Object,UnityEngine.Object)
+IL_004b: ldc.r8 0
+IL_0054: ret
+IL_0055: ldarg.0
+IL_0056: ldloc.0
+IL_0057: ldarg.2
+IL_0058: ldarg.0
+IL_0059: callvirt System.Double Part::TransferResource(PartResource,System.Double,Part)
+IL_005e: dup
+IL_005f: pop
+IL_0060: ret
+System.Double Part::TransferResource(PartResource,System.Double,Part)
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldarg.3
+IL_0004: ldc.i4.0
+IL_0005: callvirt System.Double Part::TransferResource(PartResource,System.Double,Part,System.Boolean)
+IL_000a: dup
+IL_000b: pop
+IL_000c: ret
+System.Double Part::TransferResource(PartResource,System.Double,Part,System.Boolean)
+IL_0000: ldarg.1
+IL_0001: callvirt PartResource/FlowMode PartResource::get_flowMode()
+IL_0006: dup
+IL_0007: pop
+IL_0008: stloc.0
+IL_0009: ldloc.0
+IL_000a: brfalse.s IL_0035
+IL_000c: ldc.i4.4
+IL_000d: switch IL_000c
+IL_0016: ldc.i4.1
+IL_0017: brtrue.s IL_001f
+IL_0019: ldtoken System.Double Part::TransferResource(PartResource,System.Double,Part,System.Boolean)
+IL_001e: pop
+IL_001f: ldarg.2
+IL_0020: ldc.r8 0
+IL_0029: bne.un.s IL_003f
+IL_002b: ldc.i4.3
+IL_002c: switch IL_002b
+IL_0035: ldc.r8 0
+IL_003e: ret
+IL_003f: ldarg.2
+IL_0040: ldc.r8 0
+IL_0049: cgt
+IL_004b: stloc.1
+IL_004c: ldloc.1
+IL_004d: brfalse.s IL_0071
+IL_004f: ldc.i4.5
+IL_0050: switch IL_004f
+IL_0059: ldloc.0
+IL_005a: ldc.i4.1
+IL_005b: bne.un.s IL_0089
+IL_005d: ldc.i4.6
+IL_005e: switch IL_005d
+IL_0067: ldc.r8 0
+IL_0070: ret
+IL_0071: ldloc.0
+IL_0072: ldc.i4.2
+IL_0073: bne.un.s IL_0089
+IL_0075: ldc.i4.6
+IL_0076: switch IL_0075
+IL_007f: ldc.r8 0
+IL_0088: ret
+IL_0089: ldarg.1
+IL_008a: ldfld System.Double PartResource::amount
+IL_008f: stloc.2
+IL_0090: ldarg.1
+IL_0091: ldfld PartResourceDefinition PartResource::info
+IL_0096: callvirt System.Single PartResourceDefinition::get_density()
+IL_009b: dup
+IL_009c: pop
+IL_009d: conv.r8
+IL_009e: stloc.3
+IL_009f: ldloc.1
+IL_00a0: brfalse IL_0292
+IL_00a5: ldc.i4.7
+IL_00a6: switch IL_00a5
+IL_00af: ldarg.1
+IL_00b0: ldfld System.Double PartResource::maxAmount
+IL_00b5: ldarg.1
+IL_00b6: ldfld System.Double PartResource::amount
+IL_00bb: sub
+IL_00bc: stloc.s V_4
+IL_00be: ldarg.2
+IL_00bf: ldloc.s V_4
+IL_00c1: blt.un IL_01ca
+IL_00c6: ldc.i4.5
+IL_00c7: switch IL_00c6
+IL_00d0: ldarg.1
+IL_00d1: ldarg.1
+IL_00d2: ldfld System.Double PartResource::maxAmount
+IL_00d7: stfld System.Double PartResource::amount
+IL_00dc: ldloc.3
+IL_00dd: ldc.r8 0
+IL_00e6: ble.un IL_0165
+IL_00eb: ldc.i4.1
+IL_00ec: switch IL_00eb
+IL_00f5: ldsfld System.Boolean HighLogic::LoadedSceneIsFlight
+IL_00fa: brfalse.s IL_0165
+IL_00fc: ldc.i4.5
+IL_00fd: switch IL_00fc
+IL_0106: ldarg.3
+IL_0107: ldarg.0
+IL_0108: call System.Boolean UnityEngine.Object::op_Inequality(UnityEngine.Object,UnityEngine.Object)
+IL_010d: dup
+IL_010e: pop
+IL_010f: brfalse.s IL_0165
+IL_0111: ldc.i4.2
+IL_0112: switch IL_0111
+IL_011b: ldarg.s simulate
+IL_011d: brtrue.s IL_0165
+IL_011f: ldc.i4.3
+IL_0120: switch IL_011f
+IL_0129: ldloc.s V_4
+IL_012b: ldloc.3
+IL_012c: mul
+IL_012d: ldarg.1
+IL_012e: ldfld PartResourceDefinition PartResource::info
+IL_0133: callvirt System.Single PartResourceDefinition::get_specificHeatCapacity()
+IL_0138: dup
+IL_0139: pop
+IL_013a: conv.r8
+IL_013b: mul
+IL_013c: stloc.s V_5
+IL_013e: ldarg.0
+IL_013f: ldarg.0
+IL_0140: ldfld System.Double Part::temperature
+IL_0145: ldarg.0
+IL_0146: ldfld System.Double Part::thermalMass
+IL_014b: mul
+IL_014c: ldloc.s V_5
+IL_014e: ldarg.3
+IL_014f: ldfld System.Double Part::temperature
+IL_0154: mul
+IL_0155: add
+IL_0156: ldarg.0
+IL_0157: ldfld System.Double Part::thermalMass
+IL_015c: ldloc.s V_5
+IL_015e: add
+IL_015f: div
+IL_0160: stfld System.Double Part::temperature
+IL_0165: ldloc.2
+IL_0166: ldc.r8 0
+IL_016f: ble.un.s IL_01ad
+IL_0171: ldc.i4.4
+IL_0172: switch IL_0171
+IL_017b: ldloc.s V_4
+IL_017d: ldc.r8 0
+IL_0186: ble.un.s IL_01c6
+IL_0188: ldc.i4.1
+IL_0189: switch IL_0188
+IL_0192: ldarg.s simulate
+IL_0194: brtrue.s IL_01c6
+IL_0196: ldc.i4.7
+IL_0197: switch IL_0196
+IL_01a0: ldsfld EventData`1<PartResource> GameEvents::onPartResourceNonemptyFull
+IL_01a5: ldarg.1
+IL_01a6: callvirt System.Void EventData`1<PartResource>::Fire(T)
+IL_01ab: br.s IL_01c6
+IL_01ad: ldarg.s simulate
+IL_01af: brtrue.s IL_01c6
+IL_01b1: ldc.i4.2
+IL_01b2: switch IL_01b1
+IL_01bb: ldsfld EventData`1<PartResource> GameEvents::onPartResourceEmptyFull
+IL_01c0: ldarg.1
+IL_01c1: callvirt System.Void EventData`1<PartResource>::Fire(T)
+IL_01c6: ldloc.s V_4
+IL_01c8: neg
+IL_01c9: ret
+IL_01ca: ldarg.1
+IL_01cb: dup
+IL_01cc: ldfld System.Double PartResource::amount
+IL_01d1: ldarg.2
+IL_01d2: add
+IL_01d3: stfld System.Double PartResource::amount
+IL_01d8: ldloc.3
+IL_01d9: ldc.r8 0
+IL_01e2: ble.un IL_0260
+IL_01e7: ldc.i4.5
+IL_01e8: switch IL_01e7
+IL_01f1: ldsfld System.Boolean HighLogic::LoadedSceneIsFlight
+IL_01f6: brfalse.s IL_0260
+IL_01f8: ldc.i4.1
+IL_01f9: switch IL_01f8
+IL_0202: ldarg.3
+IL_0203: ldarg.0
+IL_0204: call System.Boolean UnityEngine.Object::op_Inequality(UnityEngine.Object,UnityEngine.Object)
+IL_0209: dup
+IL_020a: pop
+IL_020b: brfalse.s IL_0260
+IL_020d: ldc.i4.7
+IL_020e: switch IL_020d
+IL_0217: ldarg.s simulate
+IL_0219: brtrue.s IL_0260
+IL_021b: ldc.i4.6
+IL_021c: switch IL_021b
+IL_0225: ldarg.2
+IL_0226: ldloc.3
+IL_0227: mul
+IL_0228: ldarg.1
+IL_0229: ldfld PartResourceDefinition PartResource::info
+IL_022e: callvirt System.Single PartResourceDefinition::get_specificHeatCapacity()
+IL_0233: dup
+IL_0234: pop
+IL_0235: conv.r8
+IL_0236: mul
+IL_0237: stloc.s V_6
+IL_0239: ldarg.0
+IL_023a: ldarg.0
+IL_023b: ldfld System.Double Part::temperature
+IL_0240: ldarg.0
+IL_0241: ldfld System.Double Part::thermalMass
+IL_0246: mul
+IL_0247: ldloc.s V_6
+IL_0249: ldarg.3
+IL_024a: ldfld System.Double Part::temperature
+IL_024f: mul
+IL_0250: add
+IL_0251: ldarg.0
+IL_0252: ldfld System.Double Part::thermalMass
+IL_0257: ldloc.s V_6
+IL_0259: add
+IL_025a: div
+IL_025b: stfld System.Double Part::temperature
+IL_0260: ldloc.2
+IL_0261: ldc.r8 0
+IL_026a: bne.un.s IL_028f
+IL_026c: ldc.i4.2
+IL_026d: switch IL_026c
+IL_0276: ldarg.s simulate
+IL_0278: brtrue.s IL_028f
+IL_027a: ldc.i4.5
+IL_027b: switch IL_027a
+IL_0284: ldsfld EventData`1<PartResource> GameEvents::onPartResourceEmptyNonempty
+IL_0289: ldarg.1
+IL_028a: callvirt System.Void EventData`1<PartResource>::Fire(T)
+IL_028f: ldarg.2
+IL_0290: neg
+IL_0291: ret
+IL_0292: ldarg.2
+IL_0293: neg
+IL_0294: starg amount
+IL_0298: ldarg.2
+IL_0299: ldarg.1
+IL_029a: ldfld System.Double PartResource::amount
+IL_029f: blt.un IL_03a4
+IL_02a4: ldc.i4.7
+IL_02a5: switch IL_02a4
+IL_02ae: ldarg.1
+IL_02af: ldc.r8 0
+IL_02b8: stfld System.Double PartResource::amount
+IL_02bd: ldloc.3
+IL_02be: ldc.r8 0
+IL_02c7: ble.un IL_0345
+IL_02cc: ldc.i4.3
+IL_02cd: switch IL_02cc
+IL_02d6: ldsfld System.Boolean HighLogic::LoadedSceneIsFlight
+IL_02db: brfalse.s IL_0345
+IL_02dd: ldc.i4.4
+IL_02de: switch IL_02dd
+IL_02e7: ldarg.3
+IL_02e8: ldarg.0
+IL_02e9: call System.Boolean UnityEngine.Object::op_Inequality(UnityEngine.Object,UnityEngine.Object)
+IL_02ee: dup
+IL_02ef: pop
+IL_02f0: brfalse.s IL_0345
+IL_02f2: ldc.i4.6
+IL_02f3: switch IL_02f2
+IL_02fc: ldarg.s simulate
+IL_02fe: brtrue.s IL_0345
+IL_0300: ldc.i4.7
+IL_0301: switch IL_0300
+IL_030a: ldloc.2
+IL_030b: ldloc.3
+IL_030c: mul
+IL_030d: ldarg.1
+IL_030e: ldfld PartResourceDefinition PartResource::info
+IL_0313: callvirt System.Single PartResourceDefinition::get_specificHeatCapacity()
+IL_0318: dup
+IL_0319: pop
+IL_031a: conv.r8
+IL_031b: mul
+IL_031c: stloc.s V_7
+IL_031e: ldarg.3
+IL_031f: ldarg.3
+IL_0320: ldfld System.Double Part::temperature
+IL_0325: ldarg.3
+IL_0326: ldfld System.Double Part::thermalMass
+IL_032b: mul
+IL_032c: ldloc.s V_7
+IL_032e: ldarg.0
+IL_032f: ldfld System.Double Part::temperature
+IL_0334: mul
+IL_0335: add
+IL_0336: ldarg.3
+IL_0337: ldfld System.Double Part::thermalMass
+IL_033c: ldloc.s V_7
+IL_033e: add
+IL_033f: div
+IL_0340: stfld System.Double Part::temperature
+IL_0345: ldloc.2
+IL_0346: ldarg.1
+IL_0347: ldfld System.Double PartResource::maxAmount
+IL_034c: bge.un.s IL_0389
+IL_034e: ldc.i4.7
+IL_034f: switch IL_034e
+IL_0358: ldloc.2
+IL_0359: ldc.r8 0
+IL_0362: ble.un.s IL_03a2
+IL_0364: ldc.i4.6
+IL_0365: switch IL_0364
+IL_036e: ldarg.s simulate
+IL_0370: brtrue.s IL_03a2
+IL_0372: ldc.i4.7
+IL_0373: switch IL_0372
+IL_037c: ldsfld EventData`1<PartResource> GameEvents::onPartResourceNonemptyEmpty
+IL_0381: ldarg.1
+IL_0382: callvirt System.Void EventData`1<PartResource>::Fire(T)
+IL_0387: br.s IL_03a2
+IL_0389: ldarg.s simulate
+IL_038b: brtrue.s IL_03a2
+IL_038d: ldc.i4.1
+IL_038e: switch IL_038d
+IL_0397: ldsfld EventData`1<PartResource> GameEvents::onPartResourceFullEmpty
+IL_039c: ldarg.1
+IL_039d: callvirt System.Void EventData`1<PartResource>::Fire(T)
+IL_03a2: ldloc.2
+IL_03a3: ret
+IL_03a4: ldarg.1
+IL_03a5: dup
+IL_03a6: ldfld System.Double PartResource::amount
+IL_03ab: ldarg.2
+IL_03ac: sub
+IL_03ad: stfld System.Double PartResource::amount
+IL_03b2: ldloc.3
+IL_03b3: ldc.r8 0
+IL_03bc: ble.un IL_043a
+IL_03c1: ldc.i4.3
+IL_03c2: switch IL_03c1
+IL_03cb: ldsfld System.Boolean HighLogic::LoadedSceneIsFlight
+IL_03d0: brfalse.s IL_043a
+IL_03d2: ldc.i4.3
+IL_03d3: switch IL_03d2
+IL_03dc: ldarg.3
+IL_03dd: ldarg.0
+IL_03de: call System.Boolean UnityEngine.Object::op_Inequality(UnityEngine.Object,UnityEngine.Object)
+IL_03e3: dup
+IL_03e4: pop
+IL_03e5: brfalse.s IL_043a
+IL_03e7: ldc.i4.4
+IL_03e8: switch IL_03e7
+IL_03f1: ldarg.s simulate
+IL_03f3: brtrue.s IL_043a
+IL_03f5: ldc.i4.2
+IL_03f6: switch IL_03f5
+IL_03ff: ldarg.2
+IL_0400: ldloc.3
+IL_0401: mul
+IL_0402: ldarg.1
+IL_0403: ldfld PartResourceDefinition PartResource::info
+IL_0408: callvirt System.Single PartResourceDefinition::get_specificHeatCapacity()
+IL_040d: dup
+IL_040e: pop
+IL_040f: conv.r8
+IL_0410: mul
+IL_0411: stloc.s V_8
+IL_0413: ldarg.3
+IL_0414: ldarg.3
+IL_0415: ldfld System.Double Part::temperature
+IL_041a: ldarg.3
+IL_041b: ldfld System.Double Part::thermalMass
+IL_0420: mul
+IL_0421: ldloc.s V_8
+IL_0423: ldarg.0
+IL_0424: ldfld System.Double Part::temperature
+IL_0429: mul
+IL_042a: add
+IL_042b: ldarg.3
+IL_042c: ldfld System.Double Part::thermalMass
+IL_0431: ldloc.s V_8
+IL_0433: add
+IL_0434: div
+IL_0435: stfld System.Double Part::temperature
+IL_043a: ldloc.2
+IL_043b: ldarg.1
+IL_043c: ldfld System.Double PartResource::maxAmount
+IL_0441: bne.un.s IL_0466
+IL_0443: ldc.i4.1
+IL_0444: switch IL_0443
+IL_044d: ldarg.s simulate
+IL_044f: brtrue.s IL_0466
+IL_0451: ldc.i4.3
+IL_0452: switch IL_0451
+IL_045b: ldsfld EventData`1<PartResource> GameEvents::onPartResourceFullNonempty
+IL_0460: ldarg.1
+IL_0461: callvirt System.Void EventData`1<PartResource>::Fire(T)
+IL_0466: ldarg.2
+IL_0467: ret
+System.Double PartSet::RequestResource(Part,System.Int32,System.Double,System.Boolean)
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldarg.3
+IL_0004: ldarg.s usePri
+IL_0006: ldc.i4.0
+IL_0007: callvirt System.Double PartSet::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_000c: dup
+IL_000d: pop
+IL_000e: ret
+System.Double PartSet::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_0000: ldarg.3
+IL_0001: ldc.r8 0
+IL_000a: cgt
+IL_000c: stloc.0
+IL_000d: ldarg.0
+IL_000e: ldarg.1
+IL_000f: ldarg.0
+IL_0010: ldarg.2
+IL_0011: ldloc.0
+IL_0012: ldarg.s simulate
+IL_0014: call PartSet/ResourcePrioritySet PartSet::GetOrCreateList(System.Int32,System.Boolean,System.Boolean)
+IL_0019: dup
+IL_001a: pop
+IL_001b: ldarg.3
+IL_001c: ldarg.s usePri
+IL_001e: ldloc.0
+IL_001f: ldarg.s simulate
+IL_0021: call System.Double PartSet::ProcessRequest(Part,PartSet/ResourcePrioritySet,System.Double,System.Boolean,System.Boolean,System.Boolean)
+IL_0026: dup
+IL_0027: pop
+IL_0028: ret
+System.Double Vessel::RequestResource(Part,System.Int32,System.Double,System.Boolean)
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldarg.3
+IL_0004: ldarg.s usePriority
+IL_0006: ldc.i4.0
+IL_0007: call System.Double Vessel::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_000c: dup
+IL_000d: pop
+IL_000e: ret
+System.Double Vessel::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_0000: ldarg.s simulate
+IL_0002: brfalse.s IL_002c
+IL_0004: ldc.i4.3
+IL_0005: switch IL_0004
+IL_000e: ldc.i4.1
+IL_000f: brtrue.s IL_0017
+IL_0011: ldtoken System.Double Vessel::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_0016: pop
+IL_0017: ldarg.0
+IL_0018: ldfld PartSet Vessel::simulationResourcePartSet
+IL_001d: ldarg.1
+IL_001e: ldarg.2
+IL_001f: ldarg.3
+IL_0020: ldarg.s usePriority
+IL_0022: ldarg.s simulate
+IL_0024: callvirt System.Double PartSet::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_0029: dup
+IL_002a: pop
+IL_002b: ret
+IL_002c: ldarg.0
+IL_002d: ldfld PartSet Vessel::resourcePartSet
+IL_0032: ldarg.1
+IL_0033: ldarg.2
+IL_0034: ldarg.3
+IL_0035: ldarg.s usePriority
+IL_0037: ldarg.s simulate
+IL_0039: callvirt System.Double PartSet::RequestResource(Part,System.Int32,System.Double,System.Boolean,System.Boolean)
+IL_003e: dup
+IL_003f: pop
+IL_0040: ret

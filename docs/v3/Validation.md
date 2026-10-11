@@ -26,8 +26,8 @@
 ## 実装済み範囲
 
 - 支持優先、Hover/AG排他、上昇/降下/ゼロG、加速度・Power制限、ブレーキ、並進/回転RCS。
-- 同調式、混成Group0、命令事前検査、TD生成OFF競合、Repose、枯渇/Gen1再充填ラッチ。
-- TD独立発電、EC依存生成、同tick直接供給、差引取得、部分取得後の再配分、SafeGuard、TA解除後の予算再利用と余剰返却。
+- 同調式、混成Group0、命令事前検査、Generation/TD Blanketの同調操作、Repose、枯渇/Gen1再充填ラッチ。
+- EC依存生成、TDブランケットのバリオン変換、同tick直接供給、差引取得、部分取得後の再配分、SafeGuard、TA解除後の予算再利用と余剰返却。
 - Field維持・反発計算、対応機Power制約、資源不足停止、空力保護と解除、経験式抗力、簡易球描画。
 - GNModuleの保存/UI/アクション、Variant基準値からの再構成、Vesselキャッシュとイベント解除、非操作船/packedの変換限定。
 - 発光・ローター・展開・粒子・音の接続。実モデルに対応するcfg指定・素材が必要。旧V2演出の完全再現ではない。
@@ -160,3 +160,70 @@ Added local-tank-driven rotation/emissive groups with independent names. Release
 - Condenser and Field shared normal colour now uses installed Generation capability, not per-tick Generated amount. Generation OFF and full tanks retain Tau red. No generator retains green fallback. Existing mixed-source and Trans-AM priorities unchanged; custom GeneratorColor routing remains pending.
 - Regression 101 exercises generation disabled, full tank, and absence of generator. Core 101 + adapter 11 passed; Release build passed with post-build deployment disabled. In-game visuals await user verification.
 
+
+## 2026-09-27 Trans-AM displaced silhouettes
+- Added GNAfterimageVisuals, separate from GNDriveV3Visuals, owned/disposed by vessel glow. Four render-only copies per eligible mesh, sharing static meshes; skinned sources bake once per visible frame into one owned mesh shared by four copies. No Part components, colliders, or bones are cloned.
+- Default offsets 1/2/3/4 metres opposite estimated net acceleration (GN applied force / vessel mass + gravity), only when GN force is nonzero and Trans-AM vessel glow is enabled. This estimate does not include aerodynamic, contact, or other engines' forces. These are displaced current poses, not recorded historical snapshots.
+- VesselGlow keys: AfterimagesEnabled=true, AfterimageSpacing=1 (metres), AfterimageOpacity=0.3, AfterimageThreshold=0.5 (m/s^2). Alpha decreases 0.3/0.225/0.15/0.075, scaled by fade; additive rendering. Appearance ~0.083 s, disappearance 0.25 s. Settings loaded on game start as existing settings are.
+- Uses same renderer exclusions as vessel glow. Materials/owned baked meshes destroyed on rebuild/dispose. Four extra mesh passes increase GPU draw workload; runtime performance and skinned appearance require KSP validation.
+- Release build succeeded with deployment disabled. Existing core 104 and adapter 11 tests passed. These tests do not exercise Unity rendering. Pending in-game: acceleration direction, stationary AG, stopping/TA OFF fade, variants/staging, scene changes, skinned transforms and performance.
+
+## 2026-09-27 Size-relative afterimage spacing
+- Supersedes fixed-metre spacing: each step is Field diameter / AfterimageSizeDivisor * AfterimageSpacing. Defaults divisor=8, spacing multiplier=1. AfterimageCount integer 0..16, default 4; zero creates no copies. Opacity decreases by (count-index)/count.
+- Reuses cached Field radius (0.5-second measurement); no extra vessel scan. Measurement now excludes GN V3 Vessel Glow shells/afterimages and inactive hierarchy renderers, avoiding recursive growth. Radius remains the existing conservative world-AABB enclosure (minimum radius 0.5m), not exact length; orientation and articulated parts can change it.
+- Existing cfg AfterimageSpacing values are now dimensionless multipliers. Restart KSP after cfg edits. Source meshes shared; count increases render cost proportionally.
+- Release build passed, core regression 105 passed including diameter scaling. Unity appearance and runtime performance require game validation.
+
+## 2026-09-27 Gradual afterimage extension
+- AfterimageExtendTime defaults to 1 second, clamped 0.01..10. Sustained acceleration advances smoothstep extension from zero to full normalized spacing; opacity also scales with extension to avoid a bright stack at startup. Acceleration magnitude is not an additional length multiplier.
+- Acceleration stopping holds extension during the existing 0.25s fade; once invisible, extension resets. Hide resets immediately. Brief interruptions resume the remaining extension.
+- Release build and 106 core + 11 adapter tests passed; Unity visuals pending user validation. User authorized direct game deployment; existing DLL/cfg backed up and replaced, matching hashes verified.
+
+## 2026-09-27 Afterimages catch up on release
+- Replaced stationary 0.25s fade with reverse smoothstep extension. AfterimageExtendTime controls both full extension and full retraction; partial extension retraces only elapsed time. Opacity follows extension in both directions. Reacceleration resumes current progress; retained direction on release. Changing acceleration direction still redirects silhouettes as before.
+- Release build passed; 107 core and 11 adapter tests passed. Backed up installed DLL and deployed new DLL with matching SHA256. Existing game cfg values need no change. In-game appearance pending.
+
+## 2026-10-03 TD Blanket replaces direct TD generation
+- Removed the legacy path where positive TopologicalDefects forced particle generation ON and independently generated EC. TopologicalDefects remains an Original-drive identity/colour input only; legacy ECPerTDSecond values are accepted but ignored.
+- Generation is now the sole visible switch for particle generation and TD Blanket; the dedicated TD toggle/action is hidden and retained only as a coupled compatibility alias. Synchronized Generation commands switch both states together. Baryon starvation latches both OFF until a Generation ON command restarts them.
+- Blanket output is `particle EC × 2 × local TD fill fraction`: 0% disables particle/EC generation without ordinary-EC fallback, 25% draws the uncovered half from vessel EC, 50% is break-even, and 100% produces twice the particle cost. Non-TD generators retain their ordinary EC path.
+- Core regressions cover zero/quarter/half/full fill, coupled commands and loaded-state reconciliation, partial baryon starvation, randomized conservation, and non-TD isolation. Core 122 + adapter 11 passed. Release build passed with 0 warnings and 0 errors. KSP was confirmed stopped; the prior DLL was backed up outside GameData at `C:\Game\GNdrive-CodexBackups\20261003-222818-td-generation-fill-balance\GNdrive.dll`, then the new DLL was deployed with matching source/installed SHA-256 `B852305F2D1633BB550C214A7A4AD54604E4D0DC035056B63237BBE1D9532D43`. KSP runtime resource/UI behaviour remains pending.
+
+## 2026-10-03 TD idle EC generation during packed time warp
+- Added a separate global `TDBlanket/IdleECPerSecond` setting, default 2 EC/s at 100% TD. Legacy production part cfgs commonly contain `ECPerTDSecond = 100`, so that field remains ignored rather than unexpectedly becoming a 100 EC/s idle source.
+- When no particles are otherwise required and TD fill is above 50%, an EC deficit now raises conversion up to the drive's full particle rate. Net charge per generated particle is `ECPerParticle × (2 × fill - 1)`; generation is capped to the amount needed to fill EC during that step, and unused particles are recorded as `ParticleSpilled`. At or below 50%, forced conversion would produce no positive net EC, so the small idle source remains the fallback. Full EC storage neither wastes baryons nor triggers starvation.
+- Regressions 123-129 cover packed full-rate charging, exact stop at full EC in a 100-second step, TD/synchronization idle scaling, 50% fallback, 75% net output, particle disposal, 2,000 randomized EC/particle/baryon conservation cases, and shared EC-capacity accounting across multiple drives. Core 129 + adapter 11 passed and the Release build succeeded. KSP was confirmed stopped; the prior DLL/cfg were backed up outside GameData at `C:\Game\GNdrive-CodexBackups\20261003-231054-td-full-charge-final`, then the final DLL/cfg were deployed. Source and installed SHA-256 match: DLL `1B6559A0A8D17C568A7196C36B2401F116E7CF65FDDE9B8356582EABE1ECF8A7`, cfg `D541AC5B43D02F5974A0D98AE83FE6506B01456AB1F3E0B1EFD05E49687F6CB9`. Actual KSP on-rails time-warp observation remains pending.
+
+## 2026-10-04 TD break-even correction and fill-gradient colours
+- Supersedes the independent idle-output behaviour above. `IdleECPerSecond` and the no-particle EC path were removed: no generated particles now means no blanket EC and no baryon use. At or below 50% TD, the generator uses stored vessel particles first and converts only the remaining current effect demand; it does not refill particle storage while idle. Below 50%, planned conversion is capped by accessible vessel EC using `ECPerParticle × (1 - 2 × fill)` per particle. At 50% it is energy-neutral. Above 50%, the prior full-power charge-until-full and particle-spill behaviour remains.
+- Drive particle, ring-glow and normal emissive colour now linearly interpolate from each module's `GeneratorColor` at 0% TD (default `1,0,0.15`) to Original green `0,1,0.65` at 100%. The existing 1.5-second visual transition remains. Trans-AM does not replace particle colour; the existing Trans-AM core/emissive and GNLight overrides remain applied to the drive itself.
+- Regressions 110 and 123-133 cover endpoints/midpoint/custom zero-TD colour, TA-independent base colour, idle non-consumption, stored-particle priority, EC-assisted rate limiting and zero-assist refusal, break-even behaviour, full-rate charging, spill, multi-drive EC capacity sharing and randomized conservation. Core 133 + adapter 11 passed; the KSP-reference Release build succeeded. KSP was confirmed stopped; the previous DLL/cfg were backed up outside GameData at `C:\Game\GNdrive-CodexBackups\20261004-013209-td-breakeven-colour-gradient`, then the new DLL/cfg were deployed. Source and installed SHA-256 match: DLL `A78E89A40FC1D3597852C7572AF9251E405C9D55690C96D48BFC18AB41334691`, cfg `95FED8D5CB21FC907333A7FE14BF9A1413C0C70AC60E88CBC6BB32AEB96C4223`. Unity/KSP colour rendering and packed-warp resource behaviour remain runtime checks.
+
+## 2026-10-04 Independent furnace and automatic TD Blanket
+- Supersedes break-even correction: see Independent_Generation_Blanket.md. Furnace refill allowed at every TD ratio if EC is available. Blanket independent of furnace/engine/sync; rated EC multiplied by local TD fraction, receives same-step furnace consumption plus EC free space. Baryon shortages auto-recover without disabling furnace. Positive TD Blanket uses green normal colour.
+- Core 125 + adapter 11 passed, including 2000 random conservation cases; superseded coupled/50%-threshold tests replaced. Release build succeeded. Runtime confirmation pending.
+
+## 2026-10-04 Stateful PAW toggles
+- Propulsion, AG, Hover, Trans-AM, Generation, Synchronization, Repose, SafeGuard and Field use stock UI_Toggle with ON/OFF text. Old event buttons hidden; methods/actions retained. Depleted and automatic Blanket remain status-only.
+- UI changes restore the prior backing field before enqueueing the requested value through existing Commands. Coordinator Publish is authoritative for acceptance, rejection, synchronization and automatic transitions. KSP-reference Release build succeeded. Stock skin's selected appearance requires in-game confirmation; no custom UI tint has been forced.
+- Core 125 + adapter 11 passed. Installed DLL backed up outside GameData and replaced while KSP stopped; SHA256 matched. Runtime UI testing pending.
+- 2026-10-04 zero-EC investigation: added regression 126 matching saved craft TD40%, furnace2000/s, blanket40000EC/s. Core confirms 16000EC/s generation with zero storage, and charging when furnace OFF. Core126/adapter11 passed; this does not verify native KSP baryon routing. No runtime fix or DLL deployment in this investigation.
+
+## 2026-10-04 Empty-EC native receiving-space correction
+- Confirmed in actual KSP 1.12.5 Assembly-CSharp.dll IL: Part.GetConnectedResourceTotals(... pulling=false) routes to PartSet, which sums maxAmount-amount into its amount output, and maxAmount into capacity. Adapter incorrectly subtracted this free-space value from capacity again. Empty EC was interpreted as no receiving room, full EC as full receiving room.
+- KspResourcePort.FreeSpace now uses the returned amount directly for native receiving queries. The old adapter stub encoded the same mistaken assumption; corrected to actual KSP semantics. Added empty/full boundary and zero-EC automatic Blanket integration tests (furnace OFF, charge to full, then stop baryon use).
+- Screenshot showed Blanket EC 12000/s and baryon use 1.335E-10 kg/s while furnace ON: generation was occurring despite displayed zero EC. Furnace OFF exposed the zero recharge demand bug. UI toggle coupling is not the cause.
+- Core126 and adapter13 passed; Release build succeeded. KSP stopped, prior DLL backed up outside GameData and fixed DLL deployed with matching hash. Actual runtime recharge remains user verification.
+
+## 2026-10-06 Sync-scaled acceleration contribution
+- Effective normal acceleration cap is sum(MaxGContribution * Sync) over Running drives. Definition/cfg contributions remain unchanged. Step computes Sync before the cap; the adapter clamps the PAW target after Step, removing the former unscaled-cap clamp that would discard bonuses.
+- Matched twins at base5G each have Sync2 and combined20G. Chosen target is not automatically multiplied; PAW max increases. TA still triples the clamped normal target. Mismatched or stopped/reposed drive contributions behave according to existing Running and synchronization membership rules; Tau uses the same coefficient.
+- PAW status is Unsynchronized for synchronization participants with Sync<=0.5; higher-priority status such as depletion or supply limit is retained with the warning appended. No change to synchronization membership/coefficient, output power, generation, or Blanket.
+- Regressions127-130 verify matched Tau cap, TA interaction, poor matches, unjoined contribution, inclusive warning boundary, and target preservation. Runtime PAW/flight verification pending.
+- Core130 + adapter13 passed; Release build succeeded. DLL backed up outside GameData and deployed with matching SHA256 while KSP stopped. No cfg changes.
+
+## 2026-10-06 N-power coefficient clarification
+- Confirmed requested coefficient already matches GNMultiDriveUnit.Coefficient: q=1-clamp(4*sampleVariance(Individuality),0,1), multiplier=N*q^N. q is pre-exponent matching quality; DriveState.Sync and PAW Synchronization are the final multiplier, not q.
+- Example N=2,q=0.7 gives per-drive multiplier0.98, total1.96 times a single identical drive, approximately ordinary double-drive output. q=1 gives multiplier N and aggregate N^2 for identical participating drives.
+- N retains existing membership: Joined (Sync ON), MultiDrive capable, Group0, not Repose. Engine OFF alone does not remove a participant. Nonparticipants and a sole participant use multiplier1.
+- MaxGContribution uses this final multiplier once. Unsynchronized threshold<=0.5 applies to the final multiplier, not q. No runtime code changes or redeployment required for this clarification.
